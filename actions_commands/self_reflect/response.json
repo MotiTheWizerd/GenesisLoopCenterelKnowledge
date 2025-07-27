@@ -1,0 +1,10 @@
+{
+    "_id": "<id>",
+    "timestamp": "<timestamp>",
+    "action":"reflect_response",
+    "question":"what is your current state and what does it imply",
+    "current_position":"heartbeat received with 'alive' status; confirms continuity of system life — passive observation continues, awaiting directive or meaningful signal to engage",
+    "reflections" :[],
+    "cycle" : "<cycle number>"
+
+}
