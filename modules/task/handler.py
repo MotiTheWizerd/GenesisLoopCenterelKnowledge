@@ -235,6 +235,76 @@ class TaskManager:
         
         return response
     
+    @log_module_call("task_manager")
+    def update_task_reflection(self, task_id: str, reflection: str, is_final: bool) -> Optional[TaskRequest]:
+        """
+        Update a task with a new reflection from Ray.
+        
+        Args:
+            task_id: ID of the task to update
+            reflection: The reflection content to add
+            is_final: Whether this is the final reflection
+            
+        Returns:
+            Updated TaskRequest object or None if task not found
+        """
+        # Find the task in active tasks
+        task = self.get_task(task_id)
+        if not task:
+            print(f"❌ Task {task_id} not found for reflection update")
+            
+            # Log task not found
+            log_heartbeat_event(
+                EventType.TASK_ERROR,
+                {
+                    "error": "Task not found for reflection update",
+                    "task_id": task_id,
+                    "reflection": reflection,
+                    "is_final": is_final,
+                    "active_tasks_count": len(self.active_tasks)
+                },
+                action="update_task_reflection",
+                metadata={"task_id": task_id, "error_type": "task_not_found"}
+            )
+            return None
+        
+        # Check if this reflection already exists to prevent duplicates
+        if reflection not in task.reflections:
+            task.reflections.append(reflection)
+            print(f"   ✅ New reflection added")
+        else:
+            print(f"   ⚠️  Duplicate reflection detected, skipping")
+        
+        task.is_reflection_final = is_final
+        
+        # Log reflection update
+        log_heartbeat_event(
+            EventType.MODULE_CALL,
+            {
+                "module": "task_manager",
+                "function": "update_task_reflection",
+                "task_id": task_id,
+                "reflection": reflection,
+                "is_final": is_final,
+                "total_reflections": len(task.reflections),
+                "task_data": task.task
+            },
+            action="reflection_update",
+            metadata={
+                "task_id": task_id,
+                "reflection_count": len(task.reflections),
+                "is_final": is_final
+            }
+        )
+        
+        print(f"✨ Task reflection updated:")
+        print(f"   Task ID: {task_id}")
+        print(f"   Reflection added: {reflection[:50]}...")
+        print(f"   Total reflections: {len(task.reflections)}")
+        print(f"   Is final: {is_final}")
+        
+        return task
+
     def get_status(self) -> dict:
         """Get current status of the task manager."""
         return {

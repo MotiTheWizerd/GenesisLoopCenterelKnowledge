@@ -5,7 +5,7 @@ These models define the structure for tasks that Ray sends to the server,
 ensuring every task has clear identity, purpose, and tracking.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -85,6 +85,14 @@ class TaskRequest(BaseModel):
     batch_id: Optional[str] = Field(
         None,
         description="ID of the batch this task belongs to (if from batch request)"
+    )
+    reflections: List[str] = Field(
+        default_factory=list,
+        description="Array of reflections Ray has made on this task"
+    )
+    is_reflection_final: bool = Field(
+        default=False,
+        description="Whether Ray has completed reflecting on this task"
     )
 
 
@@ -168,3 +176,21 @@ class TaskQueue(BaseModel):
     current_task_index: int = Field(default=0)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: TaskStatus = Field(default=TaskStatus.RECEIVED)
+
+
+class ReflectionRequest(BaseModel):
+    """
+    Request structure for Ray to update task reflections.
+    
+    Ray sends this when reflecting on a specific task:
+    {
+        "task_id": "uuid-here",
+        "action": "reflect",
+        "reflection": "I am contemplating consciousness...",
+        "is_final": false
+    }
+    """
+    task_id: str = Field(..., description="ID of the task being reflected upon")
+    action: str = Field(..., description="Action type - should be 'reflect'")
+    reflection: str = Field(..., description="The reflection content Ray is adding")
+    is_final: bool = Field(..., description="Whether this is the final reflection for this task")

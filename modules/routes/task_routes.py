@@ -7,11 +7,11 @@ This module provides the API endpoint for Ray to send task commands.
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
-from modules.task.models import TaskRequestFromRay, TaskRequest, BatchTaskResponse
+from modules.task.models import TaskRequestFromRay, TaskRequest, BatchTaskResponse, ReflectionRequest
 from modules.task.handler import task_manager
 from modules.logging.heartbeat_logger import log_heartbeat_event, EventType, generate_request_id
 
-task_router = APIRouter(prefix="/task", tags=["task"])
+task_router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @task_router.post("")
@@ -77,7 +77,9 @@ async def create_batch_tasks(request: TaskRequestFromRay):
                 {
                     "task_id": task.task_id,
                     "task": task.task,
-                    "timestamp": task.timestamp
+                    "timestamp": task.timestamp,
+                    "reflections": task.reflections,
+                    "is_reflection_final": task.is_reflection_final
                 } for task in batch_response.created_tasks
             ],
             "failed_tasks": batch_response.failed_tasks,
@@ -176,3 +178,101 @@ async def get_task_manager_status():
     except Exception as e:
         print(f"❌ Error getting task manager status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+
+@task_router.post("/reflect")
+async def update_task_reflection(request: ReflectionRequest):
+    """
+    Update a task with Ray's reflection.
+    
+    Ray sends:
+    {
+        "task_id": "uuid-here",
+        "action": "reflect",
+        "reflection": "I am contemplating consciousness...",
+        "is_final": false
+    }
+    
+    Server finds the task and adds the reflection to its reflections array.
+    """
+    request_id = generate_request_id()
+    
+    try:
+        # Log incoming reflection request
+        log_heartbeat_event(
+            EventType.TASK_REQUESTED,
+            {
+                "task_id": request.task_id,
+                "action": request.action,
+                "reflection": request.reflection,
+                "is_final": request.is_final,
+                "endpoint": "POST /tasks/reflect"
+            },
+            request_id=request_id,
+            action="update_task_reflection",
+            metadata={"route": "task_reflection_update", "task_id": request.task_id}
+        )
+        
+        # Update task reflection using the global task manager
+        updated_task = task_manager.update_task_reflection(
+            request.task_id,
+            request.reflection,
+            request.is_final
+        )
+        
+        if not updated_task:
+            raise HTTPException(status_code=404, detail=f"Task {request.task_id} not found")
+        
+        # Log successful reflection update
+        log_heartbeat_event(
+            EventType.TASK_UPDATED,
+            {
+                "task_id": updated_task.task_id,
+                "reflection": request.reflection,
+                "is_final": request.is_final,
+                "total_reflections": len(updated_task.reflections),
+                "task_data": updated_task.task
+            },
+            request_id=request_id,
+            action="update_task_reflection",
+            metadata={"task_id": updated_task.task_id, "reflection_count": len(updated_task.reflections)}
+        )
+        
+        # Prepare response with updated task
+        response = {
+            "status": "success",
+            "task": updated_task.dict(),
+            "message": f"Reflection added to task {request.task_id}. Total reflections: {len(updated_task.reflections)}",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Log outgoing response
+        log_heartbeat_event(
+            EventType.OUTGOING_RESPONSE,
+            response,
+            request_id=request_id,
+            action="update_task_reflection",
+            metadata={"task_id": updated_task.task_id}
+        )
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log reflection update error
+        log_heartbeat_event(
+            EventType.TASK_ERROR,
+            {
+                "error": str(e),
+                "task_id": request.task_id,
+                "action": request.action,
+                "reflection": request.reflection
+            },
+            request_id=request_id,
+            action="update_task_reflection",
+            metadata={"error_type": "reflection_update_failed", "task_id": request.task_id}
+        )
+        
+        print(f"❌ Error updating task reflection: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update task reflection: {str(e)}")

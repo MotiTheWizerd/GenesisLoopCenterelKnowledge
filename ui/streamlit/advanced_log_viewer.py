@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
+from typing import Dict, List, Optional
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -41,7 +42,7 @@ class AdvancedLogViewer:
         sessions = {}
         
         for log in reflect_logs:
-            request_id = log.get('request_id', 'unknown')
+            request_id = log.get('request_id') or 'unknown'
             if request_id not in sessions:
                 sessions[request_id] = []
             sessions[request_id].append(log)
@@ -160,7 +161,7 @@ def main():
             for i, log in enumerate(page_logs):
                 timestamp = log.get('timestamp', '')
                 event_type = log.get('event_type', '').title()
-                request_id = log.get('request_id', '')[:8]
+                request_id = (log.get('request_id') or '')[:8]
                 
                 with st.expander(f"🕐 {timestamp} - {event_type} ({request_id})"):
                     col1, col2 = st.columns(2)
@@ -200,10 +201,23 @@ def main():
         
         st.metric("Total Reflect Sessions", len(sessions))
         
-        # Session selector
-        session_ids = list(sessions.keys())
-        selected_session = st.selectbox("Select Session", session_ids, 
-                                      format_func=lambda x: f"Session {x[:8]}... ({len(sessions[x])} events)")
+        # Session selector - filter out None values
+        session_ids = [sid for sid in sessions.keys() if sid is not None]
+        
+        if not session_ids:
+            st.warning("No valid session IDs found in the logs.")
+            return
+            
+        def format_session(x):
+            try:
+                if x and x in sessions:
+                    return f"Session {x[:8]}... ({len(sessions[x])} events)"
+                else:
+                    return f"Unknown Session ({x})"
+            except Exception:
+                return "Invalid Session"
+        
+        selected_session = st.selectbox("Select Session", session_ids, format_func=format_session)
         
         if selected_session:
             session_logs = sessions[selected_session]
