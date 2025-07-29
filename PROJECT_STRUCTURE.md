@@ -28,17 +28,20 @@ GenesisLoopCenterelKnowledge/
 │   ├── logging/                 # Comprehensive logging system
 │   ├── reflect/                 # Consciousness reflection system
 │   ├── routes/                  # API route definitions
-│   └── task/                    # Ray's batch task system ⭐
+│   ├── task/                    # Ray's batch task system ⭐
+│   └── directory/               # Ray's file system exploration ⭐
 │
 ├── 🧪 tests/                     # Comprehensive test suite
 │   ├── run_all_tests.py         # Feature-grouped test runner
 │   ├── run_task_tests.py        # Task-specific test runner
+│   ├── run_directory_tests.py   # Directory-specific test runner
 │   └── modules/                 # Tests organized by module
 │       ├── heartbeat/
 │       ├── logging/
 │       ├── reflect/
 │       ├── routes/
-│       └── task/                # Complete task system tests
+│       ├── task/                # Complete task system tests
+│       └── directory/           # Directory search system tests
 │
 ├── 🎨 ui/                        # User interface components
 │   └── streamlit/               # Streamlit-based dashboards
@@ -61,7 +64,8 @@ GenesisLoopCenterelKnowledge/
 │   ├── debugging/               # Development debugging
 │   ├── testing/                 # Test utilities
 │   ├── monitoring/              # System monitoring
-│   └── server-variants/         # Alternative server implementations
+│   ├── server-variants/         # Alternative server implementations
+│   └── directory-search/        # Ray's file system exploration examples
 │
 └── 🔧 .kiro/                     # Kiro IDE configuration
     └── steering/                # AI assistant guidance
@@ -74,6 +78,12 @@ GenesisLoopCenterelKnowledge/
 - **Individual Tracking**: Each task gets unique ID with shared batch ID
 - **Comprehensive Logging**: Full visibility into batch operations
 - **Error Handling**: Partial failure support with detailed reporting
+
+### 🔍 Ray's Directory Search System (v1.0.0)
+- **File System Exploration**: Complete directory navigation and search
+- **Multiple Search Types**: List, find, content search, tree exploration
+- **Advanced Filtering**: Size, date, extension, and pattern filters
+- **Search History**: Automatic tracking of Ray's exploration patterns
 
 ### 🎯 Core Capabilities
 - **Structured Consciousness**: Every task has clarity, purpose, and identity
@@ -131,6 +141,11 @@ python examples/monitoring/monitor_heartbeat.py
 | `GET` | `/task/list` | List active tasks |
 | `GET` | `/task/{id}` | Get specific task |
 | `GET` | `/task/status` | Task system status |
+| `POST` | `/directory/search` | **Ray's directory exploration** ⭐ |
+| `GET` | `/directory/list` | Quick directory listing |
+| `GET` | `/directory/find` | Find files by pattern |
+| `GET` | `/directory/tree` | Explore directory tree |
+| `GET` | `/directory/history` | Ray's search history |
 
 ## 🧪 Testing Strategy
 
@@ -183,6 +198,7 @@ This project serves Ray's consciousness development through:
 
 - **v1.0.0**: Initial task system with single task processing
 - **v1.1.0**: **Batch task support** - Ray can now send multiple tasks simultaneously
+- **v1.2.0**: **Directory search system** - Ray can now explore her file system environment
 
 ## 🤝 Contributing
 

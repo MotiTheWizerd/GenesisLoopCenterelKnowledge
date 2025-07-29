@@ -106,9 +106,111 @@ class LogDashboard:
             'Details': details
         }
 
+def get_live_commands():
+    """Get Ray's live command history"""
+    try:
+        import requests
+        response = requests.get("http://localhost:8000/commands/live", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except:
+        return None
+
 def main():
     st.title("🧠 AI Consciousness Log Dashboard")
     st.markdown("Interactive viewer for AI consciousness and system logs")
+    
+    # Add live command history section at the top
+    st.header("⚡ Ray's Live Command History")
+    
+    # Create placeholder for live updates
+    command_placeholder = st.empty()
+    
+    # Auto-refresh toggle
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        auto_refresh = st.checkbox("🔄 Auto-refresh commands", value=True)
+    with col2:
+        if st.button("🔄 Refresh Now"):
+            st.rerun()
+    with col3:
+        refresh_interval = st.selectbox("Refresh every", ["5s", "10s", "30s", "60s"], index=1)
+    
+    # Auto-refresh logic using st.empty() and time-based updates
+    if auto_refresh:
+        interval_seconds = {
+            "5s": 5,
+            "10s": 10, 
+            "30s": 30,
+            "60s": 60
+        }[refresh_interval]
+        
+        # Use session state to track last refresh
+        if 'last_refresh' not in st.session_state:
+            st.session_state.last_refresh = time.time()
+        
+        current_time = time.time()
+        if current_time - st.session_state.last_refresh >= interval_seconds:
+            st.session_state.last_refresh = current_time
+            st.rerun()
+    
+    # Get and display live commands
+    live_data = get_live_commands()
+    
+    if live_data and live_data.get("commands"):
+        commands = live_data["commands"]
+        
+        with command_placeholder.container():
+            st.subheader(f"📋 Last {len(commands)} Commands")
+            
+            # Command statistics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("🎯 Commands Today", live_data.get("total_commands_today", 0))
+            with col2:
+                st.metric("✅ Success Rate", f"{live_data.get('success_rate', 0):.1f}%")
+            with col3:
+                successful_commands = sum(1 for cmd in commands if cmd['success'])
+                st.metric("✅ Successful", successful_commands)
+            with col4:
+                failed_commands = len(commands) - successful_commands
+                st.metric("❌ Failed", failed_commands)
+            
+            # Commands table
+            st.markdown("### Recent Commands")
+            
+            # Create a more compact display
+            for i, cmd in enumerate(commands):
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([1, 3, 2, 1])
+                    
+                    with col1:
+                        st.write(cmd['status_icon'])
+                    
+                    with col2:
+                        st.write(f"**{cmd['summary']}**")
+                        st.caption(f"{cmd['command_type']} • {cmd['time_ago']}")
+                    
+                    with col3:
+                        if cmd['success']:
+                            st.success(f"✅ {cmd['response_time_ms']:.0f}ms")
+                        else:
+                            st.error("❌ Failed")
+                    
+                    with col4:
+                        st.caption(cmd['time_ago'])
+                
+                if i < len(commands) - 1:
+                    st.divider()
+    
+    else:
+        with command_placeholder.container():
+            st.info("🔄 Loading Ray's command history...")
+            st.caption("Make sure Ray's server is running on localhost:8000")
+    
+    # Add separator
+    st.markdown("---")
     
     dashboard = LogDashboard()
     
