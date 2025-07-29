@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from modules.logging.heartbeat_logger import log_heartbeat_event, EventType, generate_request_id
+from utils.timestamp_utils import add_ray_timestamp_to_response, get_ray_time_context
 
 memory_router = APIRouter(prefix="/memory", tags=["memory"])
 
@@ -232,7 +233,11 @@ async def get_reflection_logs(request: RememberRequest):
         print(f"   Tasks found: {response.total_tasks}")
         print(f"   Total reflections: {response.total_reflections}")
         
-        return response
+        # Add comprehensive timestamp information for Ray
+        response_dict = response.dict()
+        response_dict = add_ray_timestamp_to_response(response_dict)
+        
+        return response_dict
         
     except HTTPException:
         raise
@@ -297,6 +302,10 @@ async def get_memory_status():
         }
         
         print(f"🎯 DEBUGGING - Memory status response: {response}")
+        
+        # Add comprehensive timestamp information for Ray
+        response = add_ray_timestamp_to_response(response)
+        
         return response
         
     except Exception as e:

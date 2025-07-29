@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from pathlib import Path
+import time
+import json
 
-from modules.routes import heartbeat_router, reflect_router, task_router, memory_router
+from modules.routes import heartbeat_router, reflect_router, task_router, memory_router, directory_router, web_router, health_router, command_history_router, self_learning_router
+from modules.command_history.handler import command_history_handler
 
 app = FastAPI(
     title="AI Consciousness API",
@@ -20,6 +23,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Command tracking middleware
+@app.middleware("http")
+async def track_commands(request: Request, call_next):
+    """Track all API commands for Ray's command history"""
+    start_time = time.time()
+    
+    # Get request info
+    method = request.method
+    url = str(request.url)
+    path = request.url.path
+    
+    # Skip tracking for certain endpoints
+    skip_paths = ["/docs", "/openapi.json", "/favicon.ico", "/commands"]
+    if any(skip_path in path for skip_path in skip_paths):
+        return await call_next(request)
+    
+    # Get request data
+    request_data = None
+    assigned_by = None
+    
+    try:
+        if method == "POST" and request.headers.get("content-type") == "application/json":
+            # Read request body
+            body = await request.body()
+            if body:
+                request_data = json.loads(body.decode())
+                assigned_by = request_data.get("assigned_by")
+        
+        # Recreate request with body for downstream processing
+        async def receive():
+            return {"type": "http.request", "body": body if 'body' in locals() else b""}
+        
+        request._receive = receive
+        
+    except Exception:
+        pass  # Continue without request data if parsing fails
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Calculate response time
+    response_time_ms = (time.time() - start_time) * 1000
+    
+    # Determine command type from path
+    command_type = _get_command_type_from_path(path)
+    
+    # Record command
+    try:
+        command_history_handler.record_command(
+            command_type=command_type,
+            endpoint=path,
+            method=method,
+            request_data=request_data,
+            response_status=response.status_code,
+            response_time_ms=response_time_ms,
+            success=200 <= response.status_code < 400,
+            error_message=None if 200 <= response.status_code < 400 else f"HTTP {response.status_code}",
+            request_id=None,  # Could add request ID header if needed
+            assigned_by=assigned_by
+        )
+    except Exception as e:
+        print(f"Error recording command: {str(e)}")
+    
+    return response
+
+def _get_command_type_from_path(path: str) -> str:
+    """Determine command type from API path"""
+    if "/web/search" in path:
+        return "search"
+    elif "/web/scrape" in path:
+        return "scrape"
+    elif "/web/" in path:
+        return "web"
+    elif "/reflect" in path:
+        return "reflect"
+    elif "/directory" in path:
+        return "directory"
+    elif "/health" in path:
+        return "health"
+    elif "/memory" in path:
+        return "memory"
+    elif "/task" in path:
+        return "task"
+    elif "/heartbeat" in path:
+        return "heartbeat"
+    else:
+        return "api"
+
 # Include routers
 print("🔧 DEBUGGING - Including routers...")
 app.include_router(heartbeat_router)
@@ -30,6 +121,16 @@ app.include_router(task_router)
 print("🔧 DEBUGGING - Task router included")
 app.include_router(memory_router)
 print("🔧 DEBUGGING - Memory router included")
+app.include_router(directory_router)
+print("🔧 DEBUGGING - Directory router included")
+app.include_router(web_router)
+print("🔧 DEBUGGING - Web router included")
+app.include_router(health_router)
+print("🔧 DEBUGGING - Health router included")
+app.include_router(command_history_router)
+print("🔧 DEBUGGING - Command history router included")
+app.include_router(self_learning_router)
+print("🔧 DEBUGGING - Self-learning router included")
 print("🔧 DEBUGGING - All routers loaded successfully")
 
 @app.get("/debug/routes")

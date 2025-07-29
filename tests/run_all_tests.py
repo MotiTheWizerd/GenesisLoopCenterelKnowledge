@@ -23,7 +23,8 @@ def run_feature_tests():
         "Heartbeat System": "tests/modules/heartbeat/",
         "Reflection System": "tests/modules/reflect/", 
         "Routing System": "tests/modules/routes/",
-        "Logging System": "tests/modules/logging/"
+        "Logging System": "tests/modules/logging/",
+        "Directory System": "tests/modules/directory/"
     }
     
     total_passed = 0
@@ -96,7 +97,8 @@ def run_specific_feature(feature_name: str):
         "heartbeat": "tests/modules/heartbeat/",
         "reflect": "tests/modules/reflect/",
         "routes": "tests/modules/routes/",
-        "logging": "tests/modules/logging/"
+        "logging": "tests/modules/logging/",
+        "directory": "tests/modules/directory/"
     }
     
     if feature_name not in feature_map:

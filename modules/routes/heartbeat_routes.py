@@ -8,6 +8,7 @@ from typing import Optional, Any
 from datetime import datetime, timezone
 
 from modules.logging.simple_logger import log_request, log_response, log_error
+from utils.timestamp_utils import add_ray_timestamp_to_response, get_ray_time_context
 
 heartbeat_router = APIRouter(prefix="/heartbeat", tags=["heartbeat"])
 
@@ -35,6 +36,10 @@ async def heartbeat_status():
         }
         
         log_response(request_id, response)
+        
+        # Add comprehensive timestamp information for Ray
+        response = add_ray_timestamp_to_response(response)
+        
         return response
         
     except Exception as e:
@@ -74,6 +79,10 @@ async def heartbeat_action(request: HeartbeatRequest):
             }
         
         log_response(request_id, response, request.action)
+        
+        # Add comprehensive timestamp information for Ray
+        response = add_ray_timestamp_to_response(response)
+        
         return response
         
     except Exception as e:
