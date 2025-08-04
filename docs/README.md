@@ -45,6 +45,9 @@ System architecture and implementation details:
 
 ### 🔧 `/troubleshooting`
 Error handling and problem resolution:
+- `README.md` - Troubleshooting guide overview and quick reference
+- `dependency-conflicts.md` - Comprehensive dependency resolution guide
+- `known-issues.md` - Current known issues and workarounds
 - `task-system-troubleshooting.md` - Task system debugging
 - `python-error-handling-details.md` - Python error management
 

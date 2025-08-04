@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ray-memory-dashboard"
+version = "1.0.0"
+description = "Advanced dashboard for Ray's consciousness and memory system"
+authors = ["Ray Consciousness Project"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+streamlit = "*"
+plotly = "*"
+pandas = "*"
+sentence-transformers = "*"
+faiss-cpu = "*"
+numpy = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+black = "*"
+flake8 = "*"
+
+[tool.poetry.scripts]
+dashboard = "run_dashboard:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

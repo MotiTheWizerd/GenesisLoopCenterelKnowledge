@@ -146,3 +146,33 @@ class WebHandler:
             logger.error(f"Combined search and scrape failed: {str(e)}")
         
         return results
+    
+    def search(self, query: str, max_results: int = 5) -> WebSearchResponse:
+        """Simple search method for backward compatibility"""
+        search_task = {
+            "task": {
+                "type": "search",
+                "query": query,
+                "max_results": max_results
+            },
+            "assigned_by": "system"
+        }
+        return self.handle_task(search_task)
+    
+    def scrape_url(self, url: str, extract_content: bool = True) -> WebScrapeResponse:
+        """Simple scrape method for backward compatibility"""
+        scrape_task = {
+            "task": {
+                "type": "scrape",
+                "url": url,
+                "extract_text": extract_content,
+                "extract_links": False,
+                "max_content_length": 10000
+            },
+            "assigned_by": "system"
+        }
+        return self.handle_task(scrape_task)
+
+
+# Create global instance
+web_manager = WebHandler()

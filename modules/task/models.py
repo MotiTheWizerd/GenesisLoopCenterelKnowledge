@@ -40,7 +40,9 @@ class TaskRequestFromRay(BaseModel):
     Ray sends this simple structure:
     {
         "task": [],
-        "assigned_by": "ray"
+        "assigned_by": "ray",
+        "execute_immediately": true,
+        "self_destruct": true
     }
     """
     task: list[Dict[str, Any]] = Field(
@@ -50,6 +52,18 @@ class TaskRequestFromRay(BaseModel):
     assigned_by: str = Field(
         ...,
         description="Who assigned this task (ray, system, user)"
+    )
+    execute_immediately: bool = Field(
+        default=False,
+        description="Whether to execute the task actions immediately upon creation"
+    )
+    self_destruct: bool = Field(
+        default=False,
+        description="Whether to delete the task after sending results to user (single-use task)"
+    )
+    self_destruct: bool = Field(
+        default=False,
+        description="Whether to delete the task after sending results to user (single-use task)"
     )
 
 
@@ -63,7 +77,9 @@ class TaskRequest(BaseModel):
         "task": {},
         "assigned_by": "ray",
         "timestamp": "<server-generated-timestamp>",
-        "batch_id": "<batch-uuid>"
+        "batch_id": "<batch-uuid>",
+        "execute_immediately": true,
+        "notes": ""
     }
     """
     task_id: str = Field(
@@ -86,6 +102,10 @@ class TaskRequest(BaseModel):
         None,
         description="ID of the batch this task belongs to (if from batch request)"
     )
+    notes: str = Field(
+        default="",
+        description="Notes that Ray can write for this task"
+    )
     reflections: List[str] = Field(
         default_factory=list,
         description="Array of reflections Ray has made on this task"
@@ -93,6 +113,14 @@ class TaskRequest(BaseModel):
     is_reflection_final: bool = Field(
         default=False,
         description="Whether Ray has completed reflecting on this task"
+    )
+    execute_immediately: bool = Field(
+        default=False,
+        description="Whether to execute the task actions immediately upon creation"
+    )
+    self_destruct: bool = Field(
+        default=False,
+        description="Whether to delete the task after sending results to user (single-use task)"
     )
 
 
@@ -130,6 +158,7 @@ class TaskResponse(BaseModel):
     )
     assigned_by: str = Field(..., description="Who originally assigned this task")
     task: Dict[str, Any] = Field(..., description="Original task data")
+    notes: str = Field(default="", description="Notes that Ray wrote for this task")
     
     # Processing results
     result: Optional[Dict[str, Any]] = Field(

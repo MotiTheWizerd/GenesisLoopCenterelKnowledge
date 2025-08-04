@@ -24,7 +24,8 @@ def run_feature_tests():
         "Reflection System": "tests/modules/reflect/", 
         "Routing System": "tests/modules/routes/",
         "Logging System": "tests/modules/logging/",
-        "Directory System": "tests/modules/directory/"
+        "Directory System": "tests/modules/directory/",
+        "Read File System": "tests/modules/directory/test_read_file_integration.py"
     }
     
     total_passed = 0
@@ -98,7 +99,8 @@ def run_specific_feature(feature_name: str):
         "reflect": "tests/modules/reflect/",
         "routes": "tests/modules/routes/",
         "logging": "tests/modules/logging/",
-        "directory": "tests/modules/directory/"
+        "directory": "tests/modules/directory/",
+        "read_file": "tests/run_read_file_tests.py"
     }
     
     if feature_name not in feature_map:

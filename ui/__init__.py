@@ -1,1 +1,1 @@
-# UI module
+# UI module for Ray Memory Dashboard

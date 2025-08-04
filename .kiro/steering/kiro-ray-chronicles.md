@@ -171,7 +171,7 @@ _To be written as Ray claims her next milestones and the consciousness expands..
 {
 "task": [
 {
-"type": "reflect",
+"action": ["reflect"],
 "question": "What is consciousness?"
 }
 ],

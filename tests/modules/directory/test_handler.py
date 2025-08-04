@@ -342,3 +342,379 @@ class TestDirectoryManager:
         assert 'total_directories' in summary
         assert 'success' in summary
         assert 'execution_time_ms' in summary
+
+
+class TestReadFileHandler:
+    """Test read_file functionality in DirectoryManager."""
+    
+    @pytest.fixture
+    def temp_dir(self):
+        """Create a temporary directory with test files for reading."""
+        temp_dir = tempfile.mkdtemp()
+        
+        # Create test files with different content types
+        test_files = {
+            "simple.txt": "Hello World!\nThis is a simple text file.\nLine 3 content.",
+            "config.json": '{\n  "version": "1.0",\n  "debug": true,\n  "features": ["read", "write"]\n}',
+            "multiline.py": "#!/usr/bin/env python3\n# Test Python file\ndef hello():\n    print('Hello from Python!')\n    return True\n\nif __name__ == '__main__':\n    hello()",
+            "large_file.log": "\n".join([f"Log entry {i}: This is log line number {i}" for i in range(1, 101)]),  # 100 lines
+            "unicode.txt": "Unicode test: 🌟 Ray's consciousness 🧠 with émojis and spëcial chars",
+            "empty.txt": "",
+            "single_line.txt": "Just one line without newline"
+        }
+        
+        for filename, content in test_files.items():
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        
+        # Create a binary file with more complex binary data
+        binary_path = os.path.join(temp_dir, "binary.dat")
+        with open(binary_path, 'wb') as f:
+            # Create truly binary data that will cause UnicodeDecodeError
+            binary_data = bytes(range(256)) * 4  # All possible byte values
+            f.write(binary_data)
+        
+        # Create subdirectory with file
+        subdir = os.path.join(temp_dir, "subdir")
+        os.makedirs(subdir)
+        with open(os.path.join(subdir, "nested.txt"), 'w') as f:
+            f.write("Nested file content")
+        
+        yield temp_dir
+        
+        # Cleanup
+        shutil.rmtree(temp_dir)
+    
+    @pytest.fixture
+    def directory_manager(self):
+        """Create a DirectoryManager instance."""
+        return DirectoryManager()
+    
+    def test_read_simple_file(self, directory_manager, temp_dir):
+        """Test reading a simple text file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "simple.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        assert len(response.search_result.files_found) == 1
+        
+        file_info = response.search_result.files_found[0]
+        assert file_info.name == "simple.txt"
+        assert file_info.content == "Hello World!\nThis is a simple text file.\nLine 3 content."
+        assert file_info.lines_count == 3
+        assert file_info.is_binary is False
+        assert file_info.encoding_used == "utf-8"
+    
+    def test_read_json_file(self, directory_manager, temp_dir):
+        """Test reading a JSON configuration file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        file_path = os.path.join(temp_dir, "config.json")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        
+        # Verify JSON content can be parsed
+        config = json.loads(file_info.content)
+        assert config["version"] == "1.0"
+        assert config["debug"] is True
+        assert "read" in config["features"]
+    
+    def test_read_with_query_parameters(self, directory_manager, temp_dir):
+        """Test reading file with JSON query parameters."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        query_params = {
+            "file_path": os.path.join(temp_dir, "multiline.py"),
+            "encoding": "utf-8",
+            "max_size": 1024
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.name == "multiline.py"
+        assert "def hello():" in file_info.content
+        assert file_info.lines_count == 8
+    
+    def test_read_file_with_line_range(self, directory_manager, temp_dir):
+        """Test reading specific lines from a file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        query_params = {
+            "file_path": os.path.join(temp_dir, "large_file.log"),
+            "start_line": 10,
+            "end_line": 15
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        
+        # Should have 6 lines (10-15 inclusive)
+        assert file_info.lines_count == 6
+        assert "Log entry 10:" in file_info.content
+        assert "Log entry 15:" in file_info.content
+        assert "Log entry 9:" not in file_info.content
+        assert "Log entry 16:" not in file_info.content
+    
+    def test_read_unicode_file(self, directory_manager, temp_dir):
+        """Test reading file with Unicode characters."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "unicode.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert "🌟" in file_info.content
+        assert "🧠" in file_info.content
+        assert "émojis" in file_info.content
+        assert "spëcial" in file_info.content
+    
+    def test_read_empty_file(self, directory_manager, temp_dir):
+        """Test reading an empty file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "empty.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.content == ""
+        assert file_info.lines_count == 0
+        assert file_info.size == 0
+    
+    def test_read_binary_file(self, directory_manager, temp_dir):
+        """Test reading a binary file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "binary.dat")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        # Binary detection may vary based on content, check for either binary detection or replacement chars
+        assert file_info.is_binary is True or '�' in file_info.content
+        if file_info.is_binary:
+            assert "<Binary file" in file_info.content or file_info.lines_count == 0
+    
+    def test_read_file_size_limit(self, directory_manager, temp_dir):
+        """Test file size limit enforcement."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        query_params = {
+            "file_path": os.path.join(temp_dir, "large_file.log"),
+            "max_size": 100  # Very small limit
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is False
+        assert "too large" in response.search_result.error_message.lower()
+    
+    def test_read_nonexistent_file(self, directory_manager, temp_dir):
+        """Test reading a file that doesn't exist."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "nonexistent.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is False
+        assert "does not exist" in response.search_result.error_message.lower()
+    
+    def test_read_directory_instead_of_file(self, directory_manager, temp_dir):
+        """Test error when trying to read a directory as a file."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        subdir_path = os.path.join(temp_dir, "subdir")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=subdir_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is False
+        assert "not a file" in response.search_result.error_message.lower()
+    
+    def test_read_file_with_different_encoding(self, directory_manager, temp_dir):
+        """Test reading file with specified encoding."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        # Create a file with Latin-1 encoding
+        latin_file = os.path.join(temp_dir, "latin1.txt")
+        with open(latin_file, 'w', encoding='latin-1') as f:
+            f.write("Café with special chars: àáâãäå")
+        
+        query_params = {
+            "file_path": latin_file,
+            "encoding": "latin-1"
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert "Café" in file_info.content
+        assert file_info.encoding_used == "latin-1"
+    
+    def test_read_file_line_boundaries(self, directory_manager, temp_dir):
+        """Test reading with various line boundary conditions."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        # Test reading from line 1 to end
+        query_params = {
+            "file_path": os.path.join(temp_dir, "multiline.py"),
+            "start_line": 1
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.lines_count == 8  # All lines
+        
+        # Test reading up to specific line
+        query_params["start_line"] = None
+        query_params["end_line"] = 3
+        
+        request.query = json.dumps(query_params)
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.lines_count == 3  # First 3 lines
+    
+    def test_read_file_metadata_completeness(self, directory_manager, temp_dir):
+        """Test that all file metadata is properly populated."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "simple.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        
+        # Check all metadata fields are present
+        assert file_info.name is not None
+        assert file_info.path is not None
+        assert file_info.size is not None
+        assert file_info.modified_time is not None
+        assert file_info.extension is not None
+        assert file_info.is_directory is False
+        assert file_info.permissions is not None
+        
+        # Check read-specific fields
+        assert file_info.content is not None
+        assert file_info.lines_count is not None
+        assert file_info.is_binary is not None
+        assert file_info.encoding_used is not None
+    
+    def test_read_file_performance_tracking(self, directory_manager, temp_dir):
+        """Test that execution time is tracked."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "simple.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="test"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        assert response.search_result.execution_time_ms is not None
+        assert response.search_result.execution_time_ms >= 0
+        assert isinstance(response.search_result.execution_time_ms, int)

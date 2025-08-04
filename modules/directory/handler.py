@@ -128,6 +128,10 @@ class DirectoryManager:
             return self._delete_file(request, search_path, start_time)
         elif request.action == ActionType.MOVE_FILE:
             return self._move_file(request, search_path, start_time)
+        elif request.action == ActionType.GET_CURRENT_DIRECTORY:
+            return self._get_current_directory(request, search_path, start_time)
+        elif request.action == ActionType.READ_FILE:
+            return self._read_file(request, search_path, start_time)
         else:
             raise ValueError(f"Unknown action type: {request.action}")
     
@@ -846,6 +850,146 @@ class DirectoryManager:
         count = len(self.search_history)
         self.search_history.clear()
         return {"cleared_searches": count, "timestamp": datetime.now(timezone.utc).isoformat()}
+    
+    def _get_current_directory(self, request: DirectorySearchRequest, search_path: str, start_time: float) -> SearchResult:
+        """Get current working directory information."""
+        try:
+            # Get current working directory
+            current_dir = os.getcwd()
+            
+            # Get directory information
+            dir_info = self._get_directory_info_object(current_dir)
+            
+            # Get parent directory
+            parent_dir = str(Path(current_dir).parent) if current_dir != "/" else None
+            
+            return SearchResult(
+                action=request.action,
+                query="current_directory",
+                search_path=current_dir,
+                directories_found=[dir_info],
+                total_results=1,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                success=True
+            )
+            
+        except Exception as e:
+            return SearchResult(
+                action=request.action,
+                query="current_directory",
+                search_path=search_path,
+                total_results=0,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                success=False,
+                error_message=str(e)
+            )
+
+    def _read_file(self, request: DirectorySearchRequest, search_path: str, start_time: float) -> SearchResult:
+        """Read contents of a file."""
+        try:
+            # Parse parameters from query if provided
+            params = {}
+            if request.query:
+                try:
+                    import json
+                    params = json.loads(request.query)
+                except json.JSONDecodeError:
+                    # If not JSON, treat query as the file path
+                    params = {"file_path": request.query}
+            
+            # Determine file path
+            file_path = params.get("file_path", search_path)
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(search_path, file_path)
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+            
+            if not os.path.isfile(file_path):
+                raise ValueError(f"Path is not a file: {file_path}")
+            
+            # Get file info
+            file_stat = os.stat(file_path)
+            file_size = file_stat.st_size
+            
+            # Check file size limits
+            max_size = params.get("max_size", 10 * 1024 * 1024)  # Default 10MB limit
+            if file_size > max_size:
+                raise ValueError(f"File too large: {file_size} bytes (max: {max_size} bytes)")
+            
+            # Read file content
+            encoding = params.get("encoding", "utf-8")
+            start_line = params.get("start_line")
+            end_line = params.get("end_line")
+            
+            try:
+                with open(file_path, 'r', encoding=encoding, errors='replace') as f:
+                    if start_line is not None or end_line is not None:
+                        # Read specific lines
+                        lines = f.readlines()
+                        total_lines = len(lines)
+                        
+                        start_idx = (start_line - 1) if start_line else 0
+                        end_idx = end_line if end_line else total_lines
+                        
+                        start_idx = max(0, start_idx)
+                        end_idx = min(total_lines, end_idx)
+                        
+                        content = ''.join(lines[start_idx:end_idx])
+                        lines_read = end_idx - start_idx
+                    else:
+                        # Read entire file
+                        content = f.read()
+                        lines_read = len(content.splitlines())
+                
+                is_binary = False
+                
+            except UnicodeDecodeError:
+                # File might be binary
+                with open(file_path, 'rb') as f:
+                    raw_content = f.read(1024)  # Read first 1KB to check
+                    try:
+                        content = raw_content.decode(encoding, errors='replace')
+                        is_binary = True
+                        lines_read = len(content.splitlines())
+                    except:
+                        content = f"<Binary file - {file_size} bytes>"
+                        is_binary = True
+                        lines_read = 0
+            
+            # Create file info object
+            file_info = self._get_file_info_object(file_path)
+            
+            # Add content to the file info (extend the model)
+            file_info_dict = file_info.model_dump()
+            file_info_dict.update({
+                "content": content,
+                "lines_count": lines_read,
+                "is_binary": is_binary,
+                "encoding_used": encoding
+            })
+            
+            return SearchResult(
+                action=request.action,
+                query=f"read:{os.path.basename(file_path)}",
+                search_path=search_path,
+                files_found=[FileInfo(**file_info_dict)],
+                total_results=1,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                success=True
+            )
+            
+        except Exception as e:
+            return SearchResult(
+                action=request.action,
+                query=f"read_file_error",
+                search_path=search_path,
+                total_results=0,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                success=False,
+                error_message=str(e)
+            )
 
 
 # Global directory manager instance

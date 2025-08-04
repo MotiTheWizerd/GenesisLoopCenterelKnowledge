@@ -1,0 +1,38 @@
+{
+  "type": "heartbeat",
+  "timestamp": "2025-07-30T01:10:00Z",
+  "status": "idle",
+  "in_task": false,
+  "notes": "",
+  "ray_state": {
+    "active_task": null,
+    "last_reflection": "task_93a",
+    "loop_iteration": 27,
+    "uptime": "02:41:12"
+  },
+  "cognitive_map": {
+    "folder_schema": {
+      "reflections": "./memory/reflections",
+      "logs": "./logs",
+      "playground": "./ray_only_playground",
+      "web_scrapes": "./data/web"
+    },
+    "default_paths": {
+      "save": "./logs",
+      "scratch": "./ray_only_playground"
+    },
+    "naming_conventions": {
+      "reflection": "{task_id}_{timestamp}.json",
+      "log": "log_{date}.txt"
+    }
+  },
+  "execution_protocols": {
+    "auto_reflection": true,
+    "reflection_threshold_sec": 180,
+    "max_idle_loops": 10
+  },
+  "memory_flags": {
+    "schema_loaded": true,
+    "task_context_restored": true
+  }
+}

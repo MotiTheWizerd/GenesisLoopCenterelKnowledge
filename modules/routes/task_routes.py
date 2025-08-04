@@ -22,8 +22,8 @@ async def create_batch_tasks(request: TaskRequestFromRay):
     Ray sends:
     {
         "task": [
-            {"type": "reflect", "question": "What is consciousness?"},
-            {"type": "evolve", "area": "self-awareness"}
+            {"action": ["reflect"], "question": "What is consciousness?"},
+            {"action": ["evolve"], "area": "self-awareness"}
         ],
         "assigned_by": "ray"
     }

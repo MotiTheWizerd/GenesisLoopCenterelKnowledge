@@ -26,6 +26,8 @@ class ActionType(str, Enum):
     RENAME_FILE = "rename_file"
     DELETE_FILE = "delete_file"
     MOVE_FILE = "move_file"
+    GET_CURRENT_DIRECTORY = "get_current_directory"
+    READ_FILE = "read_file"
 
 
 class SearchType(str, Enum):
@@ -46,6 +48,12 @@ class FileInfo(BaseModel):
     extension: Optional[str] = Field(None, description="File extension")
     is_directory: bool = Field(default=False, description="Whether this is a directory")
     permissions: Optional[str] = Field(None, description="File permissions")
+    
+    # Additional fields for read operations
+    content: Optional[str] = Field(None, description="File content (when read)")
+    lines_count: Optional[int] = Field(None, description="Number of lines in file")
+    is_binary: Optional[bool] = Field(None, description="Whether file is binary")
+    encoding_used: Optional[str] = Field(None, description="Encoding used to read file")
 
 
 class DirectoryInfo(BaseModel):
@@ -222,3 +230,35 @@ class FileOperationResponse(BaseModel):
     assigned_by: str = Field(..., description="Who requested this operation")
     error_message: Optional[str] = Field(None, description="Error message if operation failed")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional operation details")
+
+
+class ReadFileRequest(BaseModel):
+    """
+    Request for reading file contents.
+    """
+    file_path: str = Field(..., description="Path to the file to read")
+    encoding: str = Field(default="utf-8", description="File encoding")
+    max_size: Optional[int] = Field(default=None, description="Maximum file size to read in bytes")
+    start_line: Optional[int] = Field(default=None, description="Start reading from this line number")
+    end_line: Optional[int] = Field(default=None, description="Stop reading at this line number")
+    assigned_by: str = Field(..., description="Who requested this read operation")
+
+
+class ReadFileResponse(BaseModel):
+    """
+    Response for file read operations.
+    """
+    success: bool = Field(..., description="Whether the read operation succeeded")
+    file_path: str = Field(..., description="Path of the file that was read")
+    content: Optional[str] = Field(None, description="File content")
+    file_size: int = Field(..., description="Size of the file in bytes")
+    lines_count: Optional[int] = Field(None, description="Number of lines in the file")
+    encoding: str = Field(..., description="Encoding used to read the file")
+    is_binary: bool = Field(default=False, description="Whether the file appears to be binary")
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="When the file was read"
+    )
+    assigned_by: str = Field(..., description="Who requested this read operation")
+    error_message: Optional[str] = Field(None, description="Error message if read failed")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional file metadata")

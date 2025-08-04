@@ -15,7 +15,7 @@ Edit
 {
   "task": [
     {
-      "type": "reflect",
+      "action": ["reflect"],
       "question": "what is changing in me right now?"
     }
   ],

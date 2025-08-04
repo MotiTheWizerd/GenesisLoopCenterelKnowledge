@@ -1,30 +1,56 @@
 [tool.poetry]
-name = "fastapi-basic"
-version = "0.1.0"
-description = "A basic FastAPI server"
-authors = ["Your Name <your.email@example.com>"]
-package-mode = false
+name = "ray-memory-dashboard"
+version = "1.0.0"
+description = "Advanced dashboard for Ray's consciousness and memory system"
+authors = ["Ray Consciousness Project"]
+readme = "README.md"
+packages = [{include = "ui"}, {include = "services"}, {include = "extract"}]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
-fastapi = "0.104.1"
-uvicorn = "0.24.0"
-starlette = "0.27.0"
-pydantic = "^2.0.0"
-requests = "^2.32.4"
-rich = "^13.7.0"
-typer = "^0.9.0"
-beautifulsoup4 = "^4.12.0"
-lxml = "^4.9.0"
-psutil = "^5.9.0"
+python = ">=3.10,<3.12"
+streamlit = ">=1.28.0,<2.0.0"
+plotly = ">=5.15.0,<6.0.0"
+pandas = ">=1.5.0,<3.0.0"
+sentence-transformers = ">=2.2.0,<3.0.0"
+faiss-cpu = ">=1.7.4,<2.0.0"
+numpy = ">=1.21.0,<2.0.0"
+scikit-learn = ">=1.3.0,<1.7.0"
+google-generativeai = "^0.8.5"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.0.0"
-httpx = "^0.28.1"
-streamlit = "^1.47.1"
-pandas = "^2.3.1"
-plotly = "^6.2.0"
+pytest = ">=7.0.0,<8.0.0"
+black = ">=23.0.0,<24.0.0"
+flake8 = ">=6.0.0,<7.0.0"
+mypy = ">=1.0.0,<2.0.0"
+
+[tool.poetry.scripts]
+dashboard = "run_dashboard:main"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

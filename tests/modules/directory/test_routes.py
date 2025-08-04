@@ -149,3 +149,168 @@ class TestDirectoryRoutes:
         assert 'total_directories' in summary
         assert 'success' in summary
         assert 'execution_time_ms' in summary
+
+
+class TestReadFileRoutes:
+    """Test read_file API route functionality."""
+    
+    @pytest.fixture
+    def temp_dir(self):
+        """Create a temporary directory with test files for reading."""
+        temp_dir = tempfile.mkdtemp()
+        
+        # Create test files
+        test_files = {
+            "simple.txt": "Hello World!\nThis is a test file.\nLine 3 content.",
+            "config.json": '{\n  "version": "1.0",\n  "debug": true\n}',
+            "empty.txt": "",
+            "unicode.txt": "Unicode: 🌟 Ray's test 🧠"
+        }
+        
+        for filename, content in test_files.items():
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        
+        yield temp_dir
+        
+        # Cleanup
+        shutil.rmtree(temp_dir)
+    
+    def test_read_file_request_processing(self, temp_dir):
+        """Test read_file request processing through handler."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "simple.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        assert response.search_result.action == ActionType.READ_FILE
+        assert len(response.search_result.files_found) == 1
+        
+        file_info = response.search_result.files_found[0]
+        assert file_info.name == "simple.txt"
+        assert file_info.content == "Hello World!\nThis is a test file.\nLine 3 content."
+        assert file_info.lines_count == 3
+        assert file_info.is_binary is False
+    
+    def test_read_file_with_query_parameters(self, temp_dir):
+        """Test read_file with JSON query parameters."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        import json
+        
+        query_params = {
+            "file_path": os.path.join(temp_dir, "config.json"),
+            "encoding": "utf-8",
+            "max_size": 1024
+        }
+        
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=".",
+            query=json.dumps(query_params),
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.name == "config.json"
+        assert '"version": "1.0"' in file_info.content
+        assert file_info.encoding_used == "utf-8"
+    
+    def test_read_file_error_handling(self, temp_dir):
+        """Test read_file error handling for invalid files."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        # Test nonexistent file
+        nonexistent_path = os.path.join(temp_dir, "nonexistent.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=nonexistent_path,
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is False
+        assert "does not exist" in response.search_result.error_message.lower()
+    
+    def test_read_file_response_structure(self, temp_dir):
+        """Test that read_file response has correct structure."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "simple.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        # Check response structure
+        assert hasattr(response, 'search_result')
+        assert hasattr(response, 'assigned_by')
+        assert response.assigned_by == "ray"
+        
+        # Check search result structure
+        result = response.search_result
+        assert hasattr(result, 'search_id')
+        assert hasattr(result, 'action')
+        assert hasattr(result, 'timestamp')
+        assert hasattr(result, 'execution_time_ms')
+        assert hasattr(result, 'success')
+        assert result.action == ActionType.READ_FILE
+        
+        # Check file info structure
+        file_info = result.files_found[0]
+        assert hasattr(file_info, 'content')
+        assert hasattr(file_info, 'lines_count')
+        assert hasattr(file_info, 'is_binary')
+        assert hasattr(file_info, 'encoding_used')
+    
+    def test_read_empty_file_handling(self, temp_dir):
+        """Test reading empty files."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "empty.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert file_info.content == ""
+        assert file_info.lines_count == 0
+        assert file_info.size == 0
+    
+    def test_read_unicode_file_handling(self, temp_dir):
+        """Test reading files with Unicode content."""
+        from modules.directory.models import DirectorySearchRequest, ActionType
+        
+        file_path = os.path.join(temp_dir, "unicode.txt")
+        request = DirectorySearchRequest(
+            action=ActionType.READ_FILE,
+            path=file_path,
+            assigned_by="ray"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        assert response.search_result.success is True
+        file_info = response.search_result.files_found[0]
+        assert "🌟" in file_info.content
+        assert "🧠" in file_info.content
+        assert file_info.is_binary is False

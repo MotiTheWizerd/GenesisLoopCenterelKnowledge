@@ -35,14 +35,14 @@ async def search_directory(request: DirectorySearchRequest):
     
     Ray can send various types of searches:
     {
-        "search_type": "list_directory",
+        "action": "list_directory",
         "path": "./modules",
         "recursive": false,
         "assigned_by": "ray"
     }
     
     {
-        "search_type": "find_files",
+        "action": "find_files",
         "path": ".",
         "query": "*.py",
         "recursive": true,
@@ -51,7 +51,7 @@ async def search_directory(request: DirectorySearchRequest):
     }
     
     {
-        "search_type": "search_content",
+        "action": "search_content",
         "path": "./modules",
         "query": "consciousness",
         "file_extensions": ["py", "md"],
@@ -319,7 +319,7 @@ async def save_to_file(request: DirectorySearchRequest):
     Save content to a file.
     
     {
-        "search_type": "save_to_file",
+        "action": "save_to_file",
         "path": "./output",
         "query": "{\"file_path\": \"search_results.json\", \"content\": \"...\", \"overwrite\": true}",
         "assigned_by": "ray"
@@ -463,7 +463,7 @@ async def rename_file(request: DirectorySearchRequest):
     Rename a file or directory.
     
     {
-        "search_type": "rename_file",
+        "action": "rename_file",
         "path": "./workspace",
         "query": "{\"source_path\": \"old_name.txt\", \"target_path\": \"new_name.txt\", \"force\": false}",
         "assigned_by": "ray"
@@ -521,7 +521,7 @@ async def delete_file(request: DirectorySearchRequest):
     Delete a file or directory.
     
     {
-        "search_type": "delete_file",
+        "action": "delete_file",
         "path": "./workspace",
         "query": "{\"target_path\": \"file_to_delete.txt\", \"force\": false, \"recursive\": false}",
         "assigned_by": "ray"
@@ -579,7 +579,7 @@ async def move_file(request: DirectorySearchRequest):
     Move a file or directory.
     
     {
-        "search_type": "move_file",
+        "action": "move_file",
         "path": "./workspace",
         "query": "{\"source_path\": \"source.txt\", \"target_path\": \"./new_location/source.txt\", \"force\": false}",
         "assigned_by": "ray"
@@ -681,6 +681,79 @@ async def clear_search_history():
         )
         
         raise HTTPException(status_code=500, detail=f"Failed to clear search history: {str(e)}")
+
+
+@directory_router.post("/read")
+async def read_file(request: DirectorySearchRequest):
+    """
+    Read contents of a file.
+    
+    {
+        "action": "read_file",
+        "path": "./workspace",
+        "query": "{\"file_path\": \"example.txt\", \"encoding\": \"utf-8\", \"max_size\": 1048576, \"start_line\": 1, \"end_line\": 100}",
+        "assigned_by": "ray"
+    }
+    
+    Or simplified:
+    {
+        "action": "read_file",
+        "path": "./example.txt",
+        "assigned_by": "ray"
+    }
+    """
+    request_id = generate_request_id()
+    
+    try:
+        log_heartbeat_event(
+            EventType.TASK_REQUESTED,
+            {
+                "action": "read_file",
+                "path": request.path,
+                "query": request.query,
+                "assigned_by": request.assigned_by,
+                "endpoint": "POST /directory/read"
+            },
+            request_id=request_id,
+            action="read_file"
+        )
+        
+        response = directory_manager.search_directory(request)
+        
+        # Log successful read
+        file_info = response.search_result.files_found[0] if response.search_result.files_found else None
+        log_heartbeat_event(
+            EventType.TASK_COMPLETED,
+            {
+                "success": response.search_result.success,
+                "file_path": file_info.path if file_info else None,
+                "file_size": file_info.size if file_info else None,
+                "lines_count": file_info.lines_count if file_info else None,
+                "is_binary": file_info.is_binary if file_info else None,
+                "assigned_by": request.assigned_by
+            },
+            request_id=request_id,
+            action="read_file_completed"
+        )
+        
+        return response
+        
+    except Exception as e:
+        log_heartbeat_event(
+            EventType.ERROR,
+            {
+                "error": str(e),
+                "action": "read_file",
+                "path": request.path,
+                "assigned_by": request.assigned_by,
+                "endpoint": "POST /directory/read"
+            },
+            request_id=request_id,
+            action="read_file_error"
+        )
+        
+        raise HTTPException(status_code=500, detail=f"Read file operation failed: {str(e)}")
+
 
 
 @directory_router.get("/status")

@@ -424,3 +424,7 @@ class HealthHandler:
             last_health_check=datetime.now(),
             next_scheduled_check=datetime.now() + timedelta(minutes=5)
         )
+
+
+# Create global instance
+health_manager = HealthHandler()

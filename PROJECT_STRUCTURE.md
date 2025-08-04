@@ -29,7 +29,8 @@ GenesisLoopCenterelKnowledge/
 │   ├── reflect/                 # Consciousness reflection system
 │   ├── routes/                  # API route definitions
 │   ├── task/                    # Ray's batch task system ⭐
-│   └── directory/               # Ray's file system exploration ⭐
+│   ├── directory/               # Ray's file system exploration ⭐
+│   └── file_ops/                # Ray's file operations (overwrite_file) ⭐
 │
 ├── 🧪 tests/                     # Comprehensive test suite
 │   ├── run_all_tests.py         # Feature-grouped test runner
@@ -41,7 +42,8 @@ GenesisLoopCenterelKnowledge/
 │       ├── reflect/
 │       ├── routes/
 │       ├── task/                # Complete task system tests
-│       └── directory/           # Directory search system tests
+│       ├── directory/           # Directory search system tests
+│       └── file_ops/            # File operations tests
 │
 ├── 🎨 ui/                        # User interface components
 │   └── streamlit/               # Streamlit-based dashboards

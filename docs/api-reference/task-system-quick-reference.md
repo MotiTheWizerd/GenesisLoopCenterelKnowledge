@@ -10,12 +10,12 @@
 {
   "task": [
     {
-      "type": "reflect",
+      "action": ["reflect"],
       "question": "What is my current state?",
       "depth": "surface"
     },
     {
-      "type": "evolve",
+      "action": ["evolve"],
       "area": "self-awareness",
       "focus": "structured processing"
     }
@@ -29,7 +29,7 @@
 {
   "task": [
     {
-      "type": "reflect",
+      "action": ["reflect"],
       "question": "What is consciousness?",
       "depth": "profound"
     }
@@ -55,8 +55,8 @@ curl -X POST http://localhost:8000/task \
   -H "Content-Type: application/json" \
   -d '{
     "task": [
-      {"type": "reflect", "question": "test1"},
-      {"type": "evolve", "area": "test2"}
+      {"action": ["reflect"], "question": "test1"},
+      {"action": ["evolve"], "area": "test2"}
     ],
     "assigned_by": "ray"
   }'

@@ -77,7 +77,7 @@ The Task System is a comprehensive module for handling Ray's task assignments wi
 
    ```json
    {
-     "task": { "type": "reflect", "question": "What is my current state?" },
+     "task": { "action": ["reflect"], "question": "What is my current state?" },
      "assigned_by": "ray"
    }
    ```

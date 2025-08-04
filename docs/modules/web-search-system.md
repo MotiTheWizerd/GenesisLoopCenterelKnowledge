@@ -43,14 +43,16 @@ POST /web/search
 **Request Format:**
 ```json
 {
-    "task": {
-        "type": "search",
-        "query": "python web scraping",
-        "max_results": 10,
-        "safe_search": true,
-        "language": "en",
-        "region": "us"
-    },
+    "task": [
+        {
+            "type": "search",
+            "query": "python web scraping",
+            "max_results": 10,
+            "safe_search": true,
+            "language": "en",
+            "region": "us"
+        }
+    ],
     "assigned_by": "ray"
 }
 ```
@@ -84,16 +86,18 @@ POST /web/scrape
 **Request Format:**
 ```json
 {
-    "task": {
-        "type": "scrape",
-        "url": "https://example.com",
-        "extract_text": true,
-        "extract_links": true,
-        "extract_images": false,
-        "max_content_length": 50000,
-        "timeout": 30,
-        "follow_redirects": true
-    },
+    "task": [
+        {
+            "type": "scrape",
+            "url": "https://example.com",
+            "extract_text": true,
+            "extract_links": true,
+            "extract_images": false,
+            "max_content_length": 50000,
+            "timeout": 30,
+            "follow_redirects": true
+        }
+    ],
     "assigned_by": "ray"
 }
 ```
@@ -208,11 +212,13 @@ POST /web/search-and-scrape
 import requests
 
 search_data = {
-    "task": {
-        "type": "search",
-        "query": "python tutorials",
-        "max_results": 5
-    },
+    "task": [
+        {
+            "type": "search",
+            "query": "python tutorials",
+            "max_results": 5
+        }
+    ],
     "assigned_by": "ray"
 }
 
@@ -225,11 +231,13 @@ results = response.json()
 import requests
 
 scrape_data = {
-    "task": {
-        "type": "scrape",
-        "url": "https://example.com",
-        "extract_text": True
-    },
+    "task": [
+        {
+            "type": "scrape",
+            "url": "https://example.com",
+            "extract_text": True
+        }
+    ],
     "assigned_by": "ray"
 }
 

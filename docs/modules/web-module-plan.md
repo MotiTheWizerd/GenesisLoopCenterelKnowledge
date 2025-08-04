@@ -44,12 +44,14 @@ docs/
 ```
 POST /web/search
 {
-    "task": {
-        "type": "search",
-        "query": "python web scraping",
-        "max_results": 10,
-        "safe_search": true
-    },
+    "task": [
+        {
+            "type": "search",
+            "query": "python web scraping",
+            "max_results": 10,
+            "safe_search": true
+        }
+    ],
     "assigned_by": "ray"
 }
 ```
@@ -58,13 +60,15 @@ POST /web/search
 ```
 POST /web/scrape
 {
-    "task": {
-        "type": "scrape",
-        "url": "https://example.com",
-        "extract_text": true,
-        "extract_links": false,
-        "max_content_length": 10000
-    },
+    "task": [
+        {
+            "type": "scrape",
+            "url": "https://example.com",
+            "extract_text": true,
+            "extract_links": false,
+            "max_content_length": 10000
+        }
+    ],
     "assigned_by": "ray"
 }
 ```

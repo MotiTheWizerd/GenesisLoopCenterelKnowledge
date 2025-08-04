@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 import json
 
-from modules.routes import heartbeat_router, reflect_router, task_router, memory_router, directory_router, web_router, health_router, command_history_router, self_learning_router
+from modules.routes import heartbeat_router, reflect_router, task_router, memory_router, directory_router, web_router, health_router, command_history_router, self_learning_router, file_ops_router
 from modules.command_history.handler import command_history_handler
 
 app = FastAPI(
@@ -131,6 +131,8 @@ app.include_router(command_history_router)
 print("🔧 DEBUGGING - Command history router included")
 app.include_router(self_learning_router)
 print("🔧 DEBUGGING - Self-learning router included")
+app.include_router(file_ops_router)
+print("🔧 DEBUGGING - File operations router included")
 print("🔧 DEBUGGING - All routers loaded successfully")
 
 @app.get("/debug/routes")
@@ -271,5 +273,6 @@ async def catch_all_debug(path: str, request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    # Use import string format to avoid reload warning with newer uvicorn versions
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
     
