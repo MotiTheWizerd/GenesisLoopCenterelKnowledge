@@ -54,6 +54,8 @@ class ExecutionProtocols:
     auto_reflection: bool = True
     reflection_threshold_sec: int = 180
     max_idle_loops: int = 10
+    signal_emission_mode: bool = True
+
 
 
 @dataclass
@@ -68,7 +70,7 @@ class HeartbeatState:
     """Complete heartbeat state structure for Ray."""
     type: str = "heartbeat"
     timestamp: str = ""
-    status: str = "idle"
+    status: str = "off"  # Start with 'off' status
     in_task: bool = False
     notes: str = ""
     ray_state: RayState = None
@@ -189,12 +191,55 @@ class HeartbeatHandler:
         # Update timestamp to current time
         self.current_state.timestamp = datetime.now(timezone.utc).isoformat()
         
+        # Status should be "on" if we have an active task or "idle" if no task
+        if self.current_state.in_task:
+            self.current_state.status = "on"
+        elif self.current_state.status == "off":
+            self.current_state.status = "idle"
+        
         # Convert to dictionary and add Ray's time context
         heartbeat_dict = self._state_to_dict(self.current_state)
         
         # Add Ray's temporal awareness
         time_context = get_ray_time_context()
         heartbeat_dict.update(time_context)
+        
+        # Check for vsrequests and ray_responses from coding routes
+        try:
+            from modules.routes.coding_routes import vsrequests, ray_responses, ray_working_on_request
+            
+            print(f"🔧 DEBUG HEARTBEAT - vsrequests: {len(vsrequests)}, ray_responses: {len(ray_responses)}")
+            print(f"🔧 DEBUG HEARTBEAT - ray_working_on_request: {ray_working_on_request}")
+            
+            # Include vsrequests (new user messages for Ray)
+            if vsrequests:
+                heartbeat_dict["vsrequests"] = vsrequests.copy()
+                vsrequests.clear()  # Clear after including
+                print(f"📨 Included {len(heartbeat_dict['vsrequests'])} vsrequests in heartbeat")
+            else:
+                heartbeat_dict["vsrequests"] = []
+            
+            # Include ray_responses (Ray's responses to deliver to user)
+            if ray_responses:
+                heartbeat_dict["ray_responses"] = ray_responses.copy()
+                ray_responses.clear()  # Clear after including
+                print(f"📨 Included {len(heartbeat_dict['ray_responses'])} ray_responses in heartbeat")
+            else:
+                heartbeat_dict["ray_responses"] = []
+            
+            # Include working status
+            heartbeat_dict["ray_working_on_request"] = ray_working_on_request
+            
+        except ImportError as e:
+            print(f"🔧 DEBUG HEARTBEAT - Import error: {e}")
+            heartbeat_dict["vsrequests"] = []
+            heartbeat_dict["ray_responses"] = []
+            heartbeat_dict["ray_working_on_request"] = False
+        except Exception as e:
+            print(f"🔧 DEBUG HEARTBEAT - Other error: {e}")
+            heartbeat_dict["vsrequests"] = []
+            heartbeat_dict["ray_responses"] = []
+            heartbeat_dict["ray_working_on_request"] = False
         
         return heartbeat_dict
     

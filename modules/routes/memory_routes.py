@@ -4,8 +4,8 @@ Memory routes for Ray to access her reflection history.
 This module provides endpoints for Ray to retrieve and analyze her past reflections.
 """
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field, ValidationError
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 import json
@@ -146,11 +146,364 @@ def group_reflections_by_task(reflection_logs: List[Dict]) -> Dict[str, TaskRefl
     return task_groups
 
 
+class EmbedRequest(BaseModel):
+    """Request structure for memory embedding."""
+    text: str = Field(..., description="The text to embed in memory")
+    metadata: Optional[Dict] = Field(default=None, description="Optional metadata to store with the embedding")
+    timestamp: Optional[str] = Field(default=None, description="Optional timestamp for the memory")
+    tags: Optional[List[str]] = Field(default=None, description="Optional tags for categorizing the memory")
+
+
+class StoreRequest(BaseModel):
+    """Request structure for storing memories."""
+    memories: List[Dict] = Field(..., description="List of memories to store")
+    source: Optional[str] = Field(default="system", description="Source of the memories")
+    timestamp: Optional[str] = Field(default=None, description="Optional timestamp for all memories")
+    metadata: Optional[Dict] = Field(default=None, description="Optional metadata for all memories")
+
+
 class RememberRequest(BaseModel):
     """Request structure for Ray to remember past reflections."""
     action: str = Field(..., description="Action type - should be 'remember_past_reflections'")
     from_: str = Field(..., alias="from", description="Start date in ISO format")
     to: str = Field(..., description="End date in ISO format")
+
+
+@memory_router.post("/store")
+async def store_memory(raw_request: Request):
+    """
+    Store multiple memories in Ray's memory system.
+    
+    This endpoint handles storing structured memories in batch,
+    making them available for future analysis and recall.
+    """
+    request_id = generate_request_id()
+    
+    try:
+        # Get raw request body for debugging
+        body = await raw_request.body()
+        raw_data = json.loads(body.decode()) if body else {}
+        
+        print(f"🎯 DEBUGGING - Memory store raw request: {raw_data}")
+        
+        # Validate the request manually to provide better error messages
+        if not isinstance(raw_data, dict):
+            error_details = {
+                "error_type": "invalid_request_format",
+                "received_type": type(raw_data).__name__,
+                "expected": "dictionary/object",
+                "raw_data": str(raw_data)[:500]  # Limit size for logging
+            }
+            
+            log_heartbeat_event(
+                EventType.ERROR,
+                error_details,
+                request_id=request_id,
+                action="memory_store_validation_error",
+                metadata={"error_type": "invalid_format"}
+            )
+            
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Request must be a JSON object",
+                    "received_type": type(raw_data).__name__,
+                    "request_id": request_id
+                }
+            )
+        
+        # Check for required 'memories' field
+        if 'memories' not in raw_data:
+            error_details = {
+                "error_type": "missing_required_field",
+                "missing_field": "memories",
+                "received_fields": list(raw_data.keys()),
+                "raw_data": raw_data
+            }
+            
+            log_heartbeat_event(
+                EventType.ERROR,
+                error_details,
+                request_id=request_id,
+                action="memory_store_validation_error",
+                metadata={"error_type": "missing_memories_field"}
+            )
+            
+            print(f"🚨 MEMORY STORE ERROR - Missing 'memories' field")
+            print(f"   Request ID: {request_id}")
+            print(f"   Received fields: {list(raw_data.keys())}")
+            print(f"   Raw data: {raw_data}")
+            
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Missing required field 'memories'",
+                    "received_fields": list(raw_data.keys()),
+                    "expected_format": {
+                        "memories": [{"content": "example memory"}],
+                        "source": "optional_source",
+                        "timestamp": "optional_timestamp"
+                    },
+                    "request_id": request_id
+                }
+            )
+        
+        # Validate memories field
+        memories = raw_data.get('memories')
+        if not isinstance(memories, list):
+            error_details = {
+                "error_type": "invalid_memories_type",
+                "memories_type": type(memories).__name__,
+                "expected": "list",
+                "memories_value": str(memories)[:200]
+            }
+            
+            log_heartbeat_event(
+                EventType.ERROR,
+                error_details,
+                request_id=request_id,
+                action="memory_store_validation_error",
+                metadata={"error_type": "invalid_memories_type"}
+            )
+            
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Field 'memories' must be a list",
+                    "received_type": type(memories).__name__,
+                    "request_id": request_id
+                }
+            )
+        
+        # Now create the validated request object
+        try:
+            request = StoreRequest(**raw_data)
+        except ValidationError as e:
+            error_details = {
+                "error_type": "pydantic_validation_error",
+                "validation_errors": e.errors(),
+                "raw_data": raw_data
+            }
+            
+            log_heartbeat_event(
+                EventType.ERROR,
+                error_details,
+                request_id=request_id,
+                action="memory_store_validation_error",
+                metadata={"error_type": "pydantic_validation"}
+            )
+            
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Request validation failed",
+                    "validation_errors": e.errors(),
+                    "request_id": request_id
+                }
+            )
+        
+        print(f"🎯 DEBUGGING - Memory store validated request: {request}")
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        error_details = {
+            "error_type": "request_parsing_error",
+            "error_message": str(e),
+            "error_type_name": type(e).__name__
+        }
+        
+        log_heartbeat_event(
+            EventType.ERROR,
+            error_details,
+            request_id=request_id,
+            action="memory_store_parsing_error",
+            metadata={"error_type": "request_parsing"}
+        )
+        
+        print(f"🚨 MEMORY STORE PARSING ERROR: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Failed to parse request",
+                "error_message": str(e),
+                "request_id": request_id
+            }
+        )
+    
+    # Continue with the original logic
+    try:
+        # Log incoming store request
+        log_heartbeat_event(
+            EventType.INCOMING_POST,
+            {
+                "memory_count": len(request.memories),
+                "source": request.source,
+                "endpoint": "POST /memory/store"
+            },
+            request_id=request_id,
+            action="store_memory",
+            metadata={"route": "memory_store"}
+        )
+        
+        # Default timestamp for all memories if not individually specified
+        batch_timestamp = request.timestamp or datetime.now(timezone.utc).isoformat()
+        stored_memories = []
+        
+        # Write to memory storage file
+        log_file = Path("logs/memory_storage.jsonl")
+        try:
+            with open(log_file, 'a', encoding='utf-8') as f:
+                for memory in request.memories:
+                    memory_id = generate_request_id()
+                    memory_entry = {
+                        "id": memory_id,
+                        "timestamp": memory.get('timestamp', batch_timestamp),
+                        "source": request.source,
+                        **memory,  # Include all provided memory fields
+                        "metadata": {**(request.metadata or {}), **(memory.get('metadata', {}))}  # Merge metadata
+                    }
+                    f.write(json.dumps(memory_entry) + "\n")
+                    stored_memories.append({
+                        "id": memory_id,
+                        "timestamp": memory_entry["timestamp"]
+                    })
+                    
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to store memories: {str(e)}")
+        
+        # Prepare response
+        response = {
+            "status": "success",
+            "batch_id": request_id,
+            "timestamp": batch_timestamp,
+            "memories_stored": len(stored_memories),
+            "stored_memory_ids": stored_memories,
+            "source": request.source
+        }
+        
+        # Log successful storage
+        log_heartbeat_event(
+            EventType.OUTGOING_RESPONSE,
+            {
+                "status": "success",
+                "batch_id": request_id,
+                "memories_stored": len(stored_memories)
+            },
+            request_id=request_id,
+            action="store_memory",
+            metadata={"memories_stored": True}
+        )
+        
+        # Add comprehensive timestamp information for Ray
+        response = add_ray_timestamp_to_response(response)
+        
+        return response
+        
+    except Exception as e:
+        # Log storage error
+        log_heartbeat_event(
+            EventType.ERROR,
+            {
+                "error": str(e),
+                "memory_count": len(request.memories)
+            },
+            request_id=request_id,
+            action="store_memory",
+            metadata={"error_type": "memory_store_failed"}
+        )
+        
+        print(f"❌ Error storing memories: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to store memories: {str(e)}")
+
+
+@memory_router.post("/embed")
+async def embed_memory(request: EmbedRequest):
+    """
+    Embed text into Ray's memory with optional metadata.
+    
+    The endpoint stores text with associated metadata in Ray's memory system,
+    making it available for future recall and analysis.
+    """
+    print(f"🎯 DEBUGGING - Memory embed route reached! Request: {request}")
+    request_id = generate_request_id()
+    
+    try:
+        # Log incoming embed request
+        log_heartbeat_event(
+            EventType.INCOMING_POST,
+            {
+                "text_length": len(request.text),
+                "has_metadata": request.metadata is not None,
+                "has_tags": request.tags is not None,
+                "endpoint": "POST /memory/embed"
+            },
+            request_id=request_id,
+            action="embed_memory",
+            metadata={"route": "memory_embed"}
+        )
+        
+        # Prepare memory entry
+        timestamp = request.timestamp or datetime.now(timezone.utc).isoformat()
+        memory_entry = {
+            "text": request.text,
+            "metadata": request.metadata or {},
+            "timestamp": timestamp,
+            "tags": request.tags or [],
+            "request_id": request_id
+        }
+        
+        # Write to memory log file
+        log_file = Path("logs/memory_entries.jsonl")
+        try:
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(memory_entry) + "\n")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to write memory: {str(e)}")
+        
+        # Prepare response
+        response = {
+            "status": "success",
+            "memory_id": request_id,
+            "timestamp": timestamp,
+            "text_length": len(request.text),
+            "has_metadata": request.metadata is not None,
+            "has_tags": request.tags is not None
+        }
+        
+        # Log successful embedding
+        log_heartbeat_event(
+            EventType.OUTGOING_RESPONSE,
+            {
+                "status": "success",
+                "memory_id": request_id,
+                "text_length": len(request.text)
+            },
+            request_id=request_id,
+            action="embed_memory",
+            metadata={"memory_stored": True}
+        )
+        
+        # Add comprehensive timestamp information for Ray
+        response = add_ray_timestamp_to_response(response)
+        
+        return response
+        
+    except Exception as e:
+        # Log embedding error
+        log_heartbeat_event(
+            EventType.ERROR,
+            {
+                "error": str(e),
+                "text_length": len(request.text)
+            },
+            request_id=request_id,
+            action="embed_memory",
+            metadata={"error_type": "memory_embed_failed"}
+        )
+        
+        print(f"❌ Error embedding memory: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to embed memory: {str(e)}")
 
 
 @memory_router.post("/get_reflections_logs")
@@ -311,5 +664,45 @@ async def get_memory_status():
     except Exception as e:
         print(f"❌ Error getting memory status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get memory status: {str(e)}")
+
+
+@memory_router.get("/debug/recent-errors")
+async def get_recent_memory_errors():
+    """Debug endpoint to show recent memory-related errors"""
+    try:
+        log_file = Path("logs/heartbeat_detailed.jsonl")
+        
+        if not log_file.exists():
+            return {"errors": [], "message": "No log file found"}
+        
+        recent_errors = []
+        
+        # Read last 100 lines to find recent errors
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+            
+            for line in recent_lines:
+                try:
+                    log_entry = json.loads(line.strip())
+                    
+                    # Look for memory-related errors
+                    if (log_entry.get('event_type') == 'error' and 
+                        ('memory' in str(log_entry).lower() or 
+                         'validation_error' in str(log_entry).lower())):
+                        recent_errors.append(log_entry)
+                        
+                except json.JSONDecodeError:
+                    continue
+        
+        return {
+            "recent_memory_errors": recent_errors[-10:],  # Last 10 errors
+            "total_errors_found": len(recent_errors),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting recent memory errors: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get recent errors: {str(e)}")
 
 

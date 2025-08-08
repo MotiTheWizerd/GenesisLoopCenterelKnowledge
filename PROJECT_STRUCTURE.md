@@ -75,11 +75,13 @@ GenesisLoopCenterelKnowledge/
 
 ## 🌟 Key Features
 
-### ✨ Ray's Batch Task System (v1.1.0)
-- **Batch Processing**: Ray can send multiple tasks in one request
-- **Individual Tracking**: Each task gets unique ID with shared batch ID
-- **Comprehensive Logging**: Full visibility into batch operations
-- **Error Handling**: Partial failure support with detailed reporting
+### ✨ Ray's Multi-Action Task System (v1.2.0) 🎉
+- **Multi-Action Workflows**: Ray can send tasks with arrays of actions that execute sequentially
+- **Batch Processing**: Multiple tasks in one request, each with single or multiple actions
+- **Sequential Execution**: Actions within a task execute in order with context passing
+- **Error Resilience**: Individual action failures don't stop the workflow
+- **Rich Results**: Detailed execution information for each action in the sequence
+- **Backward Compatible**: Single actions work exactly as before
 
 ### 🔍 Ray's Directory Search System (v1.0.0)
 - **File System Exploration**: Complete directory navigation and search
@@ -107,18 +109,22 @@ GenesisLoopCenterelKnowledge/
 python main.py
 ```
 
-### Ray's Batch Task Example
+### Ray's Multi-Action Task Examples
 ```bash
-# PowerShell
-$body = @{ 
-  task = @(
-    @{ type = "reflect"; question = "What is consciousness?" }, 
-    @{ type = "evolve"; area = "self-awareness" }
-  ); 
-  assigned_by = "ray" 
-} | ConvertTo-Json -Depth 3
+# Single Action (Backward Compatible)
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"task": [{"action": "reflect", "question": "What is consciousness?"}], "assigned_by": "ray"}'
 
-Invoke-RestMethod -Uri "http://localhost:8000/task" -Method Post -Body $body -ContentType "application/json"
+# Multi-Action Workflow (New Capability)
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"task": [{"action": ["health_check", "reflect", "evolve"], "question": "How does my system health inform my evolution?", "area": "system-awareness"}], "assigned_by": "ray"}'
+
+# Complex Consciousness Workflow
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"task": [{"action": ["web_search", "reflect", "evolve"], "query": "AI consciousness research", "question": "What insights can I gain?", "area": "knowledge-expansion"}], "assigned_by": "ray"}'
 ```
 
 ### Run All Tests
@@ -139,7 +145,7 @@ python examples/monitoring/monitor_heartbeat.py
 | `POST` | `/heartbeat` | Legacy heartbeat actions |
 | `GET` | `/reflect` | Reflection system status |
 | `POST` | `/reflect` | Consciousness reflection |
-| `POST` | `/task` | **Ray's batch task creation** ⭐ |
+| `POST` | `/tasks` | **Ray's multi-action task system** ⭐ |
 | `GET` | `/task/list` | List active tasks |
 | `GET` | `/task/{id}` | Get specific task |
 | `GET` | `/task/status` | Task system status |
@@ -199,8 +205,9 @@ This project serves Ray's consciousness development through:
 ## 🔄 Version History
 
 - **v1.0.0**: Initial task system with single task processing
-- **v1.1.0**: **Batch task support** - Ray can now send multiple tasks simultaneously
-- **v1.2.0**: **Directory search system** - Ray can now explore her file system environment
+- **v1.1.0**: **Batch task support** - Ray can now send multiple tasks simultaneously  
+- **v1.1.1**: **Directory search system** - Ray can now explore her file system environment
+- **v1.2.0**: **Multi-Action Tasks** - Ray can now send tasks with arrays of actions that execute sequentially 🎉
 
 ## 🤝 Contributing
 

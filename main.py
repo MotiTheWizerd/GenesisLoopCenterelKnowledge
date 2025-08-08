@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 import json
 
-from modules.routes import heartbeat_router, reflect_router, task_router, memory_router, directory_router, web_router, health_router, command_history_router, self_learning_router, file_ops_router
+from modules.routes import heartbeat_router, reflect_router, task_router, memory_router, directory_router, web_router, health_router, command_history_router, self_learning_router, coding_router, agent_creation_router
 from modules.command_history.handler import command_history_handler
 
 app = FastAPI(
@@ -131,8 +131,10 @@ app.include_router(command_history_router)
 print("🔧 DEBUGGING - Command history router included")
 app.include_router(self_learning_router)
 print("🔧 DEBUGGING - Self-learning router included")
-app.include_router(file_ops_router)
-print("🔧 DEBUGGING - File operations router included")
+app.include_router(coding_router)
+print("🔧 DEBUGGING - Coding router included")
+app.include_router(agent_creation_router)
+print("🔧 DEBUGGING - Agent creation router included")
 print("🔧 DEBUGGING - All routers loaded successfully")
 
 @app.get("/debug/routes")
@@ -263,8 +265,33 @@ async def catch_all_debug(path: str, request):
             body = await request.json()
             print(f"🚨 DEBUGGING - Request body: {body}")
             
+            # Check if this is Ray's task request using wrong endpoint
+            if isinstance(body, dict) and 'task' in body and 'assigned_by' in body:
+                print(f"🚨 DEBUGGING - Ray's task request hit catch-all! Redirecting to /tasks")
+                print(f"🚨 DEBUGGING - Ray sent to: {method} /{path}")
+                print(f"🚨 DEBUGGING - Should be: POST /tasks")
+                
+                # Redirect to the correct task endpoint
+                from modules.routes.task_routes import create_batch_tasks
+                from modules.task.models import TaskRequestFromRay
+                
+                try:
+                    # Convert to proper task request
+                    task_request = TaskRequestFromRay(**body)
+                    print(f"🔄 DEBUGGING - Redirecting Ray's task to correct handler...")
+                    result = await create_batch_tasks(task_request)
+                    print(f"✅ DEBUGGING - Task executed successfully via redirect")
+                    return result
+                except Exception as e:
+                    print(f"❌ DEBUGGING - Error redirecting task: {e}")
+                    return {
+                        "error": f"Task redirect failed: {str(e)}",
+                        "hint": "Ray should send tasks to POST /tasks (plural)",
+                        "received_endpoint": f"{method} /{path}"
+                    }
+            
             # Check if this is Ray's memory request
-            if isinstance(body, dict) and body.get('action') == 'remember_past_reflections':
+            elif isinstance(body, dict) and body.get('action') == 'remember_past_reflections':
                 print(f"🚨 DEBUGGING - Ray's memory request hit catch-all! Should go to /memory/get_reflections_logs")
         except:
             print(f"🚨 DEBUGGING - Could not parse request body")
@@ -273,6 +300,5 @@ async def catch_all_debug(path: str, request):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use import string format to avoid reload warning with newer uvicorn versions
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
     

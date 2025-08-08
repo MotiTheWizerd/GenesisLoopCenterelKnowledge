@@ -7,6 +7,9 @@ This module maintains a global task list and processes incoming task requests.
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from uuid import uuid4
+import asyncio
+import concurrent.futures
+import threading
 
 from .models import TaskRequestFromRay, TaskRequest, TaskResponse, BatchTaskResponse, TaskStatus
 from modules.logging.middleware import log_module_call
@@ -69,6 +72,16 @@ class TaskManager:
                     if execution_result:
                         # Update the task with execution results
                         task.task["execution_result"] = execution_result
+                        
+                        # For agent creation, add all agent fields directly to task for Ray's extension
+                        if (task.task.get("action") == "agents/create" and 
+                            execution_result.get("executed") and 
+                            "results" in execution_result):
+                            agent_results = execution_result["results"]
+                            # Add all agent fields directly to the task
+                            task.task.update(agent_results)
+                            print(f"   🆔 Agent fields added to task: {agent_results.get('agent_id')}")
+                        
                         print(f"   ⚡ Task {i+1}/{len(ray_request.task)} executed immediately: {task.task_id[:8]}")
                     else:
                         print(f"   ⚠️  Task {i+1}/{len(ray_request.task)} immediate execution failed: {task.task_id[:8]}")
@@ -168,6 +181,16 @@ class TaskManager:
             execution_result = self._execute_task_immediately(task)
             if execution_result:
                 task.task["execution_result"] = execution_result
+                
+                # For agent creation, add all agent fields directly to task for Ray's extension
+                if (task.task.get("action") == "agents/create" and 
+                    execution_result.get("executed") and 
+                    "results" in execution_result):
+                    agent_results = execution_result["results"]
+                    # Add all agent fields directly to the task
+                    task.task.update(agent_results)
+                    print(f"   🆔 Agent fields added to task: {agent_results.get('agent_id')}")
+                
                 print(f"   ⚡ Task executed immediately")
         
         # Log task addition to global list
@@ -340,7 +363,7 @@ class TaskManager:
 
     def _execute_task_immediately(self, task: TaskRequest) -> Optional[Dict[str, Any]]:
         """
-        Execute a task immediately based on its action type.
+        Execute a task immediately based on its action type(s) and execution mode.
         
         Args:
             task: The task to execute
@@ -350,55 +373,328 @@ class TaskManager:
         """
         try:
             task_data = task.task
-            action = task_data.get("action")
+            actions = task.get_actions()
+            execution_mode = task.get_execution_mode()
             
-            print(f"⚡ Executing task immediately: {action}")
+            if not actions:
+                print(f"   ⚠️  No actions found in task")
+                return {"error": "No actions found in task", "executed": False}
             
-            # Reflection actions
-            if action == "reflect":
-                return self._execute_reflection_task(task_data)
-            
-            # Evolution actions
-            elif action == "evolve":
-                return self._execute_evolution_task(task_data)
-            
-            # Directory actions
-            elif action in [
-                "list_directory", 
-                "find_files", 
-                "search_content", 
-                "get_file_info", 
-                "explore_tree",
-                "find_by_extension",
-                "recent_files",
-                "save_to_file",
-                "rename_file",
-                "delete_file",
-                "move_file",
-                "get_current_directory"
-            ]:
-                return self._execute_directory_action(task_data)
-            
-            # Web actions
-            elif action in ["web_search", "web_scrape"]:
-                return self._execute_web_action(task_data)
-            
-            # File operations
-            elif action in ["overwrite_file", "write_file", "read_file"]:
-                return self._execute_file_operation(task_data)
-            
-            # Health actions
-            elif action in ["health_check", "system_status"]:
-                return self._execute_health_action(task_data)
-            
-            # Other actions can be added here
+            if execution_mode == "single":
+                # Single action - use existing logic
+                print(f"⚡ Executing single action: {actions[0]}")
+                return self._execute_single_action(actions[0], task_data)
+            elif execution_mode == "parallel":
+                # Multiple actions - execute in parallel
+                print(f"⚡ Executing actions in PARALLEL: {actions}")
+                return self._execute_action_parallel(actions, task_data)
             else:
-                print(f"   ⚠️  Unknown action for immediate execution: {action}")
-                return {"error": f"Unknown action: {action}", "executed": False}
+                # Multiple actions - execute sequentially (default)
+                print(f"⚡ Executing actions SEQUENTIALLY: {actions}")
+                return self._execute_action_sequence(actions, task_data)
                 
         except Exception as e:
             print(f"   ❌ Immediate execution failed: {str(e)}")
             return {"error": str(e), "executed": False}
+    
+    def _execute_single_action(self, action: str, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a single action.
+        
+        Args:
+            action: The action to execute
+            task_data: The task data containing parameters
+            
+        Returns:
+            Dict with execution results
+        """
+        # Reflection actions
+        if action == "reflect":
+            return self._execute_reflection_task(task_data)
+        
+        # Evolution actions
+        elif action == "evolve":
+            return self._execute_evolution_task(task_data)
+        
+        # Directory actions
+        elif action in [
+            "list_directory", 
+            "find_files", 
+            "search_content", 
+            "get_file_info", 
+            "explore_tree",
+            "find_by_extension",
+            "recent_files",
+            "save_to_file",
+            "rename_file",
+            "delete_file",
+            "move_file",
+            "get_current_directory"
+        ]:
+            return self._execute_directory_action(task_data)
+        
+        # Web actions
+        elif action in ["web_search", "web_scrape"]:
+            return self._execute_web_action(task_data)
+        
+        # File operations
+        elif action in ["overwrite_file", "write_file", "read_file"]:
+            return self._execute_file_operation(task_data)
+        
+        # Health actions
+        elif action in ["health_check", "system_status"]:
+            return self._execute_health_action(task_data)
+        
+        # Agent creation actions
+        elif action.startswith("agents/"):
+            return self._execute_agent_action(task_data)
+        
+        # Other actions can be added here
+        else:
+            print(f"   ⚠️  Unknown action for immediate execution: {action}")
+            return {"error": f"Unknown action: {action}", "executed": False}
+    
+    def _execute_action_sequence(self, actions: List[str], task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute multiple actions sequentially, passing results between them.
+        
+        Args:
+            actions: List of actions to execute in order
+            task_data: The task data containing parameters
+            
+        Returns:
+            Dict with aggregated execution results
+        """
+        sequence_results = {
+            "executed": True,
+            "action_sequence": actions,
+            "total_actions": len(actions),
+            "action_results": [],
+            "final_result": None,
+            "execution_summary": {
+                "successful_actions": 0,
+                "failed_actions": 0,
+                "total_execution_time_ms": 0
+            }
+        }
+        
+        # Context that can be passed between actions
+        action_context = {}
+        
+        for i, action in enumerate(actions):
+            print(f"   🔄 Executing action {i+1}/{len(actions)}: {action}")
+            
+            try:
+                # Create modified task data for this action
+                current_task_data = task_data.copy()
+                current_task_data["action"] = action  # Set single action for execution
+                
+                # Add context from previous actions
+                if action_context:
+                    current_task_data["previous_results"] = action_context
+                
+                # Execute the single action
+                start_time = datetime.now()
+                action_result = self._execute_single_action(action, current_task_data)
+                end_time = datetime.now()
+                
+                execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                
+                # Add execution metadata
+                action_result["action_index"] = i
+                action_result["action_name"] = action
+                action_result["execution_time_ms"] = execution_time_ms
+                
+                sequence_results["action_results"].append(action_result)
+                sequence_results["execution_summary"]["total_execution_time_ms"] += execution_time_ms
+                
+                if action_result.get("executed", False):
+                    sequence_results["execution_summary"]["successful_actions"] += 1
+                    
+                    # Update context for next action
+                    if "results" in action_result:
+                        action_context[action] = action_result["results"]
+                    
+                    print(f"      ✅ Action {action} completed successfully")
+                else:
+                    sequence_results["execution_summary"]["failed_actions"] += 1
+                    print(f"      ❌ Action {action} failed: {action_result.get('error', 'Unknown error')}")
+                    
+                    # Continue with other actions even if one fails
+                    action_context[action] = {"error": action_result.get("error", "Unknown error")}
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"      ❌ Action {action} failed with exception: {error_msg}")
+                
+                sequence_results["action_results"].append({
+                    "executed": False,
+                    "action_index": i,
+                    "action_name": action,
+                    "error": error_msg,
+                    "execution_time_ms": 0
+                })
+                sequence_results["execution_summary"]["failed_actions"] += 1
+                action_context[action] = {"error": error_msg}
+        
+        # Set final result based on the last successful action or overall summary
+        if sequence_results["action_results"]:
+            last_result = sequence_results["action_results"][-1]
+            if last_result.get("executed", False):
+                sequence_results["final_result"] = last_result.get("results")
+        
+        # Overall success if at least one action succeeded
+        sequence_results["executed"] = sequence_results["execution_summary"]["successful_actions"] > 0
+        
+        print(f"   🏁 Action sequence completed:")
+        print(f"      Successful: {sequence_results['execution_summary']['successful_actions']}")
+        print(f"      Failed: {sequence_results['execution_summary']['failed_actions']}")
+        print(f"      Total time: {sequence_results['execution_summary']['total_execution_time_ms']}ms")
+        
+        return sequence_results
+    
+    def _execute_action_parallel(self, actions: List[str], task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute multiple actions in parallel using threading.
+        
+        Args:
+            actions: List of actions to execute simultaneously
+            task_data: The task data containing parameters
+            
+        Returns:
+            Dict with aggregated parallel execution results
+        """
+        parallel_results = {
+            "executed": True,
+            "action_sequence": actions,
+            "execution_mode": "parallel",
+            "total_actions": len(actions),
+            "action_results": [],
+            "final_result": None,
+            "execution_summary": {
+                "successful_actions": 0,
+                "failed_actions": 0,
+                "total_execution_time_ms": 0,
+                "max_execution_time_ms": 0,
+                "min_execution_time_ms": float('inf'),
+                "parallel_efficiency": 0.0
+            }
+        }
+        
+        print(f"   🔄 Starting parallel execution of {len(actions)} actions")
+        
+        # Record start time for overall execution
+        overall_start_time = datetime.now()
+        
+        # Function to execute a single action with timing
+        def execute_action_with_timing(action_index: int, action: str) -> Dict[str, Any]:
+            print(f"   🧵 Thread {action_index}: Starting {action}")
+            
+            try:
+                # Create modified task data for this action
+                current_task_data = task_data.copy()
+                current_task_data["action"] = action  # Set single action for execution
+                
+                # Execute the single action
+                start_time = datetime.now()
+                action_result = self._execute_single_action(action, current_task_data)
+                end_time = datetime.now()
+                
+                execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                
+                # Add execution metadata
+                action_result["action_index"] = action_index
+                action_result["action_name"] = action
+                action_result["execution_time_ms"] = execution_time_ms
+                action_result["thread_id"] = threading.current_thread().ident
+                
+                print(f"   🧵 Thread {action_index}: {action} completed in {execution_time_ms}ms")
+                return action_result
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"   🧵 Thread {action_index}: {action} failed with exception: {error_msg}")
+                
+                return {
+                    "executed": False,
+                    "action_index": action_index,
+                    "action_name": action,
+                    "error": error_msg,
+                    "execution_time_ms": 0,
+                    "thread_id": threading.current_thread().ident
+                }
+        
+        # Execute actions in parallel using ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(actions)) as executor:
+            # Submit all actions for parallel execution
+            future_to_action = {
+                executor.submit(execute_action_with_timing, i, action): (i, action)
+                for i, action in enumerate(actions)
+            }
+            
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(future_to_action):
+                action_index, action_name = future_to_action[future]
+                try:
+                    action_result = future.result()
+                    parallel_results["action_results"].append(action_result)
+                    
+                    # Update execution summary
+                    execution_time = action_result.get("execution_time_ms", 0)
+                    parallel_results["execution_summary"]["total_execution_time_ms"] += execution_time
+                    
+                    if execution_time > parallel_results["execution_summary"]["max_execution_time_ms"]:
+                        parallel_results["execution_summary"]["max_execution_time_ms"] = execution_time
+                    
+                    if execution_time < parallel_results["execution_summary"]["min_execution_time_ms"]:
+                        parallel_results["execution_summary"]["min_execution_time_ms"] = execution_time
+                    
+                    if action_result.get("executed", False):
+                        parallel_results["execution_summary"]["successful_actions"] += 1
+                    else:
+                        parallel_results["execution_summary"]["failed_actions"] += 1
+                        
+                except Exception as e:
+                    print(f"   ❌ Failed to get result for {action_name}: {str(e)}")
+                    parallel_results["execution_summary"]["failed_actions"] += 1
+        
+        # Calculate overall execution time (wall clock time for parallel execution)
+        overall_end_time = datetime.now()
+        overall_execution_time_ms = int((overall_end_time - overall_start_time).total_seconds() * 1000)
+        
+        # Sort action results by action_index to maintain order
+        parallel_results["action_results"].sort(key=lambda x: x.get("action_index", 0))
+        
+        # Calculate parallel efficiency (how much faster than sequential)
+        total_sequential_time = parallel_results["execution_summary"]["total_execution_time_ms"]
+        if overall_execution_time_ms > 0:
+            parallel_results["execution_summary"]["parallel_efficiency"] = (
+                total_sequential_time / overall_execution_time_ms
+            )
+        
+        # Set the actual wall clock time as the overall execution time
+        parallel_results["execution_summary"]["overall_execution_time_ms"] = overall_execution_time_ms
+        
+        # Set final result based on the last successful action or overall summary
+        successful_results = [r for r in parallel_results["action_results"] if r.get("executed", False)]
+        if successful_results:
+            # Use the result from the action with the highest index (last in original order)
+            parallel_results["final_result"] = max(
+                successful_results, 
+                key=lambda x: x.get("action_index", 0)
+            ).get("results")
+        
+        # Overall success if at least one action succeeded
+        parallel_results["executed"] = parallel_results["execution_summary"]["successful_actions"] > 0
+        
+        print(f"   🏁 Parallel execution completed:")
+        print(f"      Successful: {parallel_results['execution_summary']['successful_actions']}")
+        print(f"      Failed: {parallel_results['execution_summary']['failed_actions']}")
+        print(f"      Wall clock time: {overall_execution_time_ms}ms")
+        print(f"      Total thread time: {total_sequential_time}ms")
+        print(f"      Parallel efficiency: {parallel_results['execution_summary']['parallel_efficiency']:.2f}x")
+        
+        return parallel_results
     
     def _execute_directory_action(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute directory-related actions immediately."""
@@ -467,14 +763,48 @@ class TaskManager:
         """Execute health-related actions immediately."""
         try:
             from modules.health.handler import health_manager
+            from modules.health.models import HealthCheckRequest
             
             action = task_data.get("action")
             if action == "health_check":
-                result = health_manager.get_system_health()
-                return {"executed": True, "action": action, "results": result}
+                # Use the correct method name
+                request = HealthCheckRequest()
+                result = health_manager.get_health_status(request)
+                return {
+                    "executed": True, 
+                    "action": action, 
+                    "results": {
+                        "status": result.overall_status.value,
+                        "message": result.status_message,
+                        "performance_score": result.performance_score,
+                        "uptime_seconds": result.uptime_seconds,
+                        "cpu_usage": result.system_metrics.cpu_usage_percent,
+                        "memory_usage": result.system_metrics.memory_usage_percent,
+                        "active_alerts": len(result.active_alerts)
+                    }
+                }
             elif action == "system_status":
-                result = health_manager.get_detailed_status()
-                return {"executed": True, "action": action, "results": result}
+                # Use the same method but return more detailed info
+                request = HealthCheckRequest(include_trends=True, include_recommendations=True)
+                result = health_manager.get_health_status(request)
+                return {
+                    "executed": True, 
+                    "action": action, 
+                    "results": {
+                        "status": result.overall_status.value,
+                        "detailed_message": result.status_message,
+                        "performance_score": result.performance_score,
+                        "system_metrics": {
+                            "cpu_usage": result.system_metrics.cpu_usage_percent,
+                            "memory_usage": result.system_metrics.memory_usage_percent,
+                            "disk_usage": result.system_metrics.disk_usage_percent,
+                            "uptime_seconds": result.uptime_seconds
+                        },
+                        "services_count": len(result.services),
+                        "active_alerts": len(result.active_alerts),
+                        "recommendations": result.recommendations
+                    }
+                }
             else:
                 return {"executed": False, "error": f"Unknown health action: {action}"}
                 
@@ -484,14 +814,22 @@ class TaskManager:
     def _execute_reflection_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute reflection tasks immediately."""
         try:
-            from modules.reflect.handler import reflect_manager
+            from modules.reflect.reflect_handler import handle_reflect
             
             question = task_data.get("question", "")
             if not question:
                 return {"executed": False, "error": "No question provided for reflection"}
             
+            # Prepare reflection request data
+            reflection_request = {
+                "question": question,
+                "depth": task_data.get("depth", "surface"),
+                "context": task_data.get("context", {}),
+                "current_position": task_data.get("current_position")
+            }
+            
             # Execute reflection
-            result = reflect_manager.process_reflection(question)
+            result = handle_reflect(reflection_request)
             
             return {
                 "executed": True,
@@ -542,6 +880,209 @@ class TaskManager:
                 "executed": True,
                 "action": task_data.get("action"),
                 "results": response.dict()
+            }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+
+    def _execute_agent_action(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent creation/management actions immediately."""
+        try:
+            action = task_data.get("action", "")
+            
+            # Handle different agent actions
+            if action == "agents/create/test":
+                # Agent test is async, so we need to handle it carefully
+                import asyncio
+                import concurrent.futures
+                
+                def run_async_test():
+                    return asyncio.run(self._execute_agent_test(task_data))
+                
+                # Run the async function in a separate thread
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async_test)
+                    return future.result()
+            elif action == "agents/create":
+                return self._execute_agent_create(task_data)
+            elif action == "agents/list":
+                return self._execute_agent_list(task_data)
+            elif action == "agents/delete":
+                return self._execute_agent_delete(task_data)
+            elif action == "agents/stats":
+                return self._execute_agent_stats(task_data)
+            else:
+                return {"executed": False, "error": f"Unknown agent action: {action}"}
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    async def _execute_agent_test(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent test action immediately."""
+        try:
+            from modules.agents.agent_creation_handler import handle_test_agent
+            from modules.agents.agent_creation_models import AgentTestRequest
+            
+            # Extract required parameters
+            agent_id = task_data.get("agent_id")
+            test_message = task_data.get("test_message")
+            user_id = task_data.get("user_id", "ray_user")
+            session_id = task_data.get("session_id", "session_001")
+            
+            if not agent_id:
+                return {"executed": False, "error": "agent_id is required for agent test"}
+            
+            if not test_message:
+                return {"executed": False, "error": "test_message is required for agent test"}
+            
+            # Create test request
+            test_request = AgentTestRequest(
+                agent_id=agent_id,
+                test_message=test_message,
+                user_id=user_id,
+                session_id=session_id
+            )
+            
+            # Execute the test
+            response = await handle_test_agent(test_request)
+            
+            # Return structured response similar to reflection format
+            if response.status == "completed":
+                return {
+                    "executed": True,
+                    "action": "agents/create/test",
+                    "results": {
+                        "type": "agent_test",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "status": "completed",
+                        "agent_id": response.agent_id,
+                        "agent_name": response.agent_name,
+                        "test_message": response.test_message,
+                        "agent_response": response.agent_response,
+                        "processing_time_ms": response.processing_time_ms,
+                        "conversation_quality": "responsive",
+                        "next_steps": [
+                            "Continue conversation",
+                            "Try different questions",
+                            "Evaluate responses"
+                        ]
+                    }
+                }
+            else:
+                return {
+                    "executed": False,
+                    "error": response.error_message or "Agent test failed"
+                }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    def _execute_agent_create(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent creation action immediately."""
+        try:
+            from modules.agents.agent_creation_handler import handle_create_agent_sync
+            from modules.agents.agent_creation_models import AgentCreationRequest
+            
+            # Extract required parameters
+            name = task_data.get("name")
+            prompt = task_data.get("prompt")
+            description = task_data.get("description", "")
+            assigned_by = task_data.get("assigned_by", "ray")
+            
+            if not name:
+                return {"executed": False, "error": "name is required for agent creation"}
+            
+            if not prompt:
+                return {"executed": False, "error": "prompt is required for agent creation"}
+            
+            # Create agent request
+            creation_request = AgentCreationRequest(
+                name=name,
+                prompt=prompt,
+                description=description,
+                assigned_by=assigned_by
+            )
+            
+            # Execute the creation
+            response = handle_create_agent_sync(creation_request)
+            
+            # Return the exact format Ray expects
+            if response.status == "created":
+                return {
+                    "executed": True,
+                    "action": "agents/create",
+                    "results": {
+                        "agent_id": response.agent_id,
+                        "status": "created",
+                        "agent_name": response.agent_name,
+                        "agent_description": response.agent_description,
+                        "created_at": response.created_at,
+                        "assigned_by": response.assigned_by,
+                        "error_message": None
+                    }
+                }
+            else:
+                return {
+                    "executed": False,
+                    "error": response.error_message or "Agent creation failed"
+                }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    def _execute_agent_list(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent list action immediately."""
+        try:
+            from modules.agents.agent_creation_handler import handle_list_agents_sync
+            
+            # Execute the list
+            response = handle_list_agents_sync()
+            
+            return {
+                "executed": True,
+                "action": "agents/list",
+                "results": response.dict()
+            }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    def _execute_agent_delete(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent delete action immediately."""
+        try:
+            from modules.agents.agent_creation_handler import handle_delete_agent_sync
+            
+            # Extract required parameters
+            agent_id = task_data.get("agent_id")
+            
+            if not agent_id:
+                return {"executed": False, "error": "agent_id is required for agent deletion"}
+            
+            # Execute the deletion
+            response = handle_delete_agent_sync(agent_id)
+            
+            return {
+                "executed": True,
+                "action": "agents/delete",
+                "agent_id": agent_id,
+                "results": response
+            }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    def _execute_agent_stats(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute agent stats action immediately."""
+        try:
+            from modules.agents.agent_creation_handler import handle_get_agent_stats_sync
+            
+            # Execute the stats
+            response = handle_get_agent_stats_sync()
+            
+            return {
+                "executed": True,
+                "action": "agents/stats",
+                "results": response
             }
                 
         except Exception as e:

@@ -29,7 +29,8 @@
   "execution_protocols": {
     "auto_reflection": true,
     "reflection_threshold_sec": 180,
-    "max_idle_loops": 10
+    "max_idle_loops": 10,
+    "signal_emission_mode": true
   },
   "memory_flags": {
     "schema_loaded": true,

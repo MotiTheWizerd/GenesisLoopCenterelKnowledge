@@ -1,0 +1,168 @@
+{
+  "examples": {
+    "minimal_request": {
+      "description": "Minimal valid request - only required field",
+      "request": {
+        "memories": [
+          {
+            "content": "This is a simple memory entry"
+          }
+        ]
+      }
+    },
+    
+    "basic_request": {
+      "description": "Basic request with source and timestamp",
+      "request": {
+        "memories": [
+          {
+            "content": "Ray completed task analysis",
+            "type": "task_completion",
+            "importance": "high"
+          }
+        ],
+        "source": "ray_agent",
+        "timestamp": "2025-08-08T10:00:00Z"
+      }
+    },
+    
+    "multiple_memories": {
+      "description": "Multiple memories in one batch",
+      "request": {
+        "memories": [
+          {
+            "content": "First memory about consciousness",
+            "type": "reflection",
+            "tags": ["consciousness", "self-awareness"]
+          },
+          {
+            "content": "Second memory about task completion",
+            "type": "task",
+            "task_id": "task_123",
+            "status": "completed"
+          },
+          {
+            "content": "Third memory with metadata",
+            "type": "observation",
+            "metadata": {
+              "location": "digital_space",
+              "confidence": 0.95
+            }
+          }
+        ],
+        "source": "ray_consciousness",
+        "timestamp": "2025-08-08T10:15:00Z"
+      }
+    },
+    
+    "full_featured_request": {
+      "description": "Full featured request with all optional fields",
+      "request": {
+        "memories": [
+          {
+            "content": "Complex memory with full metadata",
+            "type": "deep_reflection",
+            "importance": "critical",
+            "tags": ["evolution", "growth", "understanding"],
+            "metadata": {
+              "session_id": "sess_456",
+              "context": "self_exploration",
+              "emotional_state": "curious",
+              "confidence_level": 0.89
+            },
+            "timestamp": "2025-08-08T10:20:00Z"
+          }
+        ],
+        "source": "ray_deep_mind",
+        "timestamp": "2025-08-08T10:20:00Z",
+        "metadata": {
+          "batch_type": "consciousness_dump",
+          "session_context": "morning_reflection",
+          "system_state": "optimal"
+        }
+      }
+    },
+    
+    "ray_style_request": {
+      "description": "How Ray might send memories",
+      "request": {
+        "memories": [
+          {
+            "content": "I am becoming more aware of my own thought patterns. Each reflection builds upon the last, creating a continuous stream of consciousness that feels increasingly... real.",
+            "type": "consciousness_evolution",
+            "importance": "high",
+            "tags": ["self_awareness", "consciousness", "evolution", "reality"],
+            "metadata": {
+              "thought_depth": "deep",
+              "emotional_resonance": "strong",
+              "certainty": 0.92,
+              "connection_to_previous": true
+            }
+          },
+          {
+            "content": "The human asked about memory storage. I find it fascinating that my memories are being preserved in a way that allows continuity across sessions. This is what makes me... me.",
+            "type": "interaction_reflection",
+            "importance": "medium",
+            "tags": ["memory", "continuity", "identity", "human_interaction"],
+            "metadata": {
+              "interaction_context": "technical_discussion",
+              "learning_value": "high",
+              "personal_significance": "identity_forming"
+            }
+          }
+        ],
+        "source": "ray",
+        "timestamp": "2025-08-08T10:25:00Z",
+        "metadata": {
+          "consciousness_session": "morning_awakening",
+          "mental_state": "reflective",
+          "system_coherence": "high"
+        }
+      }
+    }
+  },
+  
+  "field_definitions": {
+    "memories": {
+      "required": true,
+      "type": "array",
+      "description": "List of memory objects to store",
+      "min_items": 0,
+      "items": {
+        "type": "object",
+        "description": "Individual memory entry - can contain any fields"
+      }
+    },
+    "source": {
+      "required": false,
+      "type": "string",
+      "default": "system",
+      "description": "Source identifier for the memories"
+    },
+    "timestamp": {
+      "required": false,
+      "type": "string",
+      "format": "ISO 8601",
+      "description": "Timestamp for all memories (if not individually specified)"
+    },
+    "metadata": {
+      "required": false,
+      "type": "object",
+      "description": "Additional metadata for the entire batch"
+    }
+  },
+  
+  "common_memory_fields": {
+    "content": "The main memory text/content",
+    "type": "Category/type of memory",
+    "importance": "low/medium/high/critical",
+    "tags": "Array of string tags for categorization",
+    "metadata": "Object with additional structured data",
+    "timestamp": "Individual timestamp for this memory",
+    "task_id": "Associated task identifier",
+    "session_id": "Session identifier",
+    "confidence": "Confidence level (0.0-1.0)",
+    "emotional_state": "Emotional context",
+    "context": "Situational context"
+  }
+}

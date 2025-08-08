@@ -9,18 +9,109 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
+def find_project_root():
+    """Find the project root directory by looking for known files."""
+    current = Path.cwd()
+    
+    # Look for project indicators
+    indicators = ["pyproject.toml", "main.py", "extract/memory_metadata.json"]
+    
+    # Check current directory and parents
+    for path in [current] + list(current.parents):
+        for indicator in indicators:
+            if (path / indicator).exists():
+                return path
+    
+    # Fallback: assume current directory
+    return current
+
+def resolve_log_path(log_file: str) -> Path:
+    """Resolve log file path relative to project root."""
+    if Path(log_file).is_absolute():
+        return Path(log_file)
+    
+    # Try relative to current directory first
+    if Path(log_file).exists():
+        return Path(log_file)
+    
+    # Try relative to project root
+    project_root = find_project_root()
+    project_log_path = project_root / log_file
+    if project_log_path.exists():
+        return project_log_path
+    
+    # Return original path (will fail later with clear error)
+    return Path(log_file)
+
 def load_logs(log_file: str = "logs/heartbeat_detailed.jsonl") -> List[Dict]:
-    """Load logs from JSONL file."""
+    """Load logs from JSONL file with robust error handling for problematic encodings."""
     logs = []
-    try:
-        with open(log_file, 'r') as f:
-            for line in f:
-                if line.strip():
-                    logs.append(json.loads(line))
-    except FileNotFoundError:
-        print(f"Log file {log_file} not found")
+    
+    # Resolve the correct path
+    log_path = resolve_log_path(log_file)
+    
+    print(f"Attempting to load log file: {log_path.absolute()}")
+    
+    # First, check if file exists and is accessible
+    if not log_path.exists():
+        print(f"Error: Log file not found at {log_path.absolute()}")
+        print(f"Current working directory: {Path.cwd()}")
+        print(f"Project root detected as: {find_project_root()}")
         return []
-    return logs
+    
+    # Try reading with different approaches
+    try:
+        # Approach 1: Try reading with error handler for problematic bytes
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        logs.append(json.loads(line))
+            print(f"Successfully read {len(logs)} log entries using utf-8 with error replacement")
+            return logs
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            logs = []  # Reset for next attempt
+        
+        # Approach 2: Try reading in binary and decoding with error handling
+        with open(log_path, 'rb') as f:
+            content = f.read()
+            
+            # Try different encodings with error handling
+            encodings = [
+                ('utf-8', 'strict'),
+                ('utf-8-sig', 'strict'),
+                ('latin-1', 'strict'),
+                ('cp1252', 'strict'),
+                ('utf-8', 'replace'),  # Replace problematic bytes
+                ('utf-8-sig', 'replace'),
+                ('latin-1', 'replace'),
+                ('cp1252', 'replace')
+            ]
+            
+            for encoding, errors in encodings:
+                try:
+                    decoded = content.decode(encoding, errors=errors)
+                    logs = []
+                    for line in decoded.splitlines():
+                        line = line.strip()
+                        if line:
+                            logs.append(json.loads(line))
+                    print(f"Successfully read {len(logs)} log entries using {encoding} encoding with {errors} error handling")
+                    return logs
+                except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                    print(f"Failed with {encoding} encoding: {str(e)[:200]}...")
+                    continue
+        
+        # If we get here, all attempts failed
+        print(f"Failed to read {log_path.absolute()} with any encoding method")
+        return []
+        
+    except Exception as e:
+        print(f"Unexpected error reading {log_path.absolute()}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 def filter_reflect_logs(logs: List[Dict]) -> List[Dict]:
     """Filter logs to show only reflect-related events."""

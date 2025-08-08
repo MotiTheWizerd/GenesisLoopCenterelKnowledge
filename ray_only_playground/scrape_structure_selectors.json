@@ -1,0 +1,133 @@
+{
+  "memory_store": {
+    "request": {
+      "memories": [
+        {
+          "type": {
+            "required": true,
+            "description": "Type of memory being stored (e.g., observation, thought, reflection)",
+            "type": "string"
+          },
+          "content": {
+            "required": true,
+            "description": "The actual content/text of the memory",
+            "type": "string"
+          },
+          "timestamp": {
+            "required": false,
+            "description": "ISO formatted timestamp for this specific memory. If not provided, will use batch timestamp or current time",
+            "type": "string",
+            "format": "date-time"
+          },
+          "metadata": {
+            "required": false,
+            "description": "Additional metadata specific to this memory",
+            "type": "object"
+          }
+        }
+      ],
+      "source": {
+        "required": false,
+        "default": "system",
+        "description": "Source of all memories in this batch",
+        "type": "string"
+      },
+      "timestamp": {
+        "required": false,
+        "description": "Default ISO formatted timestamp for all memories that don't specify their own",
+        "type": "string",
+        "format": "date-time"
+      },
+      "metadata": {
+        "required": false,
+        "description": "Default metadata to apply to all memories in batch",
+        "type": "object"
+      }
+    },
+    "response": {
+      "status": {
+        "type": "string",
+        "description": "Success status of the operation",
+        "enum": ["success"]
+      },
+      "batch_id": {
+        "type": "string",
+        "description": "Unique ID for this batch of memories"
+      },
+      "timestamp": {
+        "type": "string",
+        "description": "ISO formatted timestamp when the batch was processed",
+        "format": "date-time"
+      },
+      "memories_stored": {
+        "type": "integer",
+        "description": "Number of memories successfully stored"
+      },
+      "stored_memory_ids": {
+        "type": "array",
+        "description": "List of stored memory details",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique ID for the stored memory"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO formatted timestamp for when this memory was stored",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "source": {
+        "type": "string",
+        "description": "Source that was recorded for these memories"
+      }
+    },
+    "examples": {
+      "request": {
+        "memories": [
+          {
+            "type": "observation",
+            "content": "First memory content",
+            "metadata": {
+              "priority": "high"
+            }
+          },
+          {
+            "type": "thought",
+            "content": "Second memory content",
+            "timestamp": "2024-01-27T12:00:00Z",
+            "metadata": {
+              "category": "planning"
+            }
+          }
+        ],
+        "source": "ray",
+        "metadata": {
+          "batch": true,
+          "purpose": "daily_reflection"
+        }
+      },
+      "response": {
+        "status": "success",
+        "batch_id": "550e8400-e29b-41d4-a716-446655440000",
+        "timestamp": "2024-01-27T12:00:01Z",
+        "memories_stored": 2,
+        "stored_memory_ids": [
+          {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "timestamp": "2024-01-27T12:00:01Z"
+          },
+          {
+            "id": "987fcdeb-51d2-12c3-b456-426614174111",
+            "timestamp": "2024-01-27T12:00:00Z"
+          }
+        ],
+        "source": "ray"
+      }
+    }
+  }
+}

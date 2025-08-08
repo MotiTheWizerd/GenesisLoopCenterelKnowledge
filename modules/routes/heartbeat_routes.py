@@ -29,12 +29,7 @@ async def heartbeat_status():
     try:
         # Get the current heartbeat state from the handler
         response = heartbeat_handler.get_current_heartbeat()
-        
-        # Ensure status is set to "alive" for GET requests
-        response["status"] = "alive"
-        
         log_response(request_id, response)
-        
         return response
         
     except Exception as e:

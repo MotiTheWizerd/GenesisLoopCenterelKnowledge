@@ -40,7 +40,7 @@ def main():
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", 
             str(dashboard_path),
-            "--server.port", "8501",
+            "--server.port", "8500",
             "--server.headless", "false"
         ])
     except KeyboardInterrupt:

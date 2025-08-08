@@ -50,4 +50,4 @@ def main():
         print("💡 Make sure streamlit is installed: poetry install")
 
 if __name__ == "__main__":
-    main()
+    main()t

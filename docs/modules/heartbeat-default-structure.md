@@ -39,7 +39,7 @@ The heartbeat now returns a complete consciousness state with the following stru
   "execution_protocols": {
     "auto_reflection": true,
     "reflection_threshold_sec": 180,
-    "max_idle_loops": 10
+    "max_idle_loops": 10,
   },
   "memory_flags": {
     "schema_loaded": true,

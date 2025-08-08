@@ -1,7 +1,6 @@
 """
 File operations handler for Ray's consciousness.
-
-This module provides comprehensive file manipulation capabilities.
+Provides comprehensive file manipulation capabilities with playground restrictions.
 """
 
 import os
@@ -9,6 +8,7 @@ import time
 import shutil
 from typing import Dict, Any, Union
 from datetime import datetime, timezone
+from pathlib import Path
 
 from .models import (
     FileWriteRequest, FileWriteResponse, FileReadRequest, FileReadResponse,
@@ -16,6 +16,7 @@ from .models import (
 )
 from modules.logging.middleware import log_module_call
 from modules.logging.heartbeat_logger import log_heartbeat_event, EventType
+from modules.middleware.ray_filesystem import RayFilesystemMiddleware
 
 
 class FileOperationsHandler:
@@ -23,7 +24,8 @@ class FileOperationsHandler:
     
     def __init__(self):
         self.operation_count = 0
-        print("📁 File Operations Handler initialized")
+        self.filesystem = RayFilesystemMiddleware()
+        print("📁 File Operations Handler initialized with Ray filesystem restrictions")
     
     @log_module_call("file_ops")
     def handle_task(self, task_data: Dict[str, Any]) -> Union[FileWriteResponse, FileReadResponse]:
@@ -91,8 +93,12 @@ class FileOperationsHandler:
         write_request = task_request.to_write_request()
         
         try:
-            # Resolve file path
-            file_path = os.path.abspath(write_request.file_path)
+            # Validate and resolve file path
+            is_valid, error_msg = self.filesystem.validate_path(write_request.file_path, "write")
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            file_path = str(self.filesystem.ensure_playground_path(write_request.file_path))
             backup_path = None
             
             print(f"📁 Writing to file: {file_path}")
@@ -172,7 +178,12 @@ class FileOperationsHandler:
         read_request = task_request.to_read_request()
         
         try:
-            file_path = os.path.abspath(read_request.file_path)
+            # Validate and resolve file path
+            is_valid, error_msg = self.filesystem.validate_path(read_request.file_path, "read")
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            file_path = str(self.filesystem.ensure_playground_path(read_request.file_path))
             
             print(f"📁 Reading file: {file_path}")
             
@@ -242,6 +253,9 @@ class FileOperationsHandler:
         """Create a backup of an existing file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = f"{file_path}.backup_{timestamp}"
+        
+        # Ensure backup path is in playground
+        backup_path = str(self.filesystem.ensure_playground_path(backup_path))
         
         shutil.copy2(file_path, backup_path)
         return backup_path
