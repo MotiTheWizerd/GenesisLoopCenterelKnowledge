@@ -409,9 +409,7 @@ class TaskManager:
         Returns:
             Dict with execution results
         """
-        if action == "send_vs_response":
-            print("its here and hitt response send_vs_respond")
-            return { "status" : "OK"}
+       
 
         # Reflection actions
         if action == "reflect":
