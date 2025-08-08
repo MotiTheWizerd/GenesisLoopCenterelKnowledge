@@ -184,7 +184,7 @@ async def store_memory(raw_request: Request):
         body = await raw_request.body()
         raw_data = json.loads(body.decode()) if body else {}
         
-        print(f"🎯 DEBUGGING - Memory store raw request: {raw_data}")
+        # print(f"🎯 DEBUGGING - Memory store raw request: {raw_data}")
         
         # Validate the request manually to provide better error messages
         if not isinstance(raw_data, dict):
@@ -302,7 +302,7 @@ async def store_memory(raw_request: Request):
                 }
             )
         
-        print(f"🎯 DEBUGGING - Memory store validated request: {request}")
+        # print(f"🎯 DEBUGGING - Memory store validated request: {request}")
         
     except HTTPException:
         raise  # Re-raise HTTP exceptions
@@ -425,7 +425,7 @@ async def embed_memory(request: EmbedRequest):
     The endpoint stores text with associated metadata in Ray's memory system,
     making it available for future recall and analysis.
     """
-    print(f"🎯 DEBUGGING - Memory embed route reached! Request: {request}")
+    # print(f"🎯 DEBUGGING - Memory embed route reached! Request: {request}")
     request_id = generate_request_id()
     
     try:

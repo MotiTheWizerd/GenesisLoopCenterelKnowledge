@@ -189,7 +189,7 @@ class TaskManager:
                     agent_results = execution_result["results"]
                     # Add all agent fields directly to the task
                     task.task.update(agent_results)
-                    print(f"   🆔 Agent fields added to task: {agent_results.get('agent_id')}")
+                    print(f"   🆔 Agent fields added to t")
                 
                 print(f"   ⚡ Task executed immediately")
         
@@ -398,6 +398,7 @@ class TaskManager:
             return {"error": str(e), "executed": False}
     
     def _execute_single_action(self, action: str, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        print("execute single action")
         """
         Execute a single action.
         
@@ -408,6 +409,10 @@ class TaskManager:
         Returns:
             Dict with execution results
         """
+        if action == "send_vs_response":
+            print("its here and hitt response send_vs_respond")
+            return { "status" : "OK"}
+
         # Reflection actions
         if action == "reflect":
             return self._execute_reflection_task(task_data)
@@ -415,7 +420,8 @@ class TaskManager:
         # Evolution actions
         elif action == "evolve":
             return self._execute_evolution_task(task_data)
-        
+
+       
         # Directory actions
         elif action in [
             "list_directory", 
@@ -554,6 +560,7 @@ class TaskManager:
         return sequence_results
     
     def _execute_action_parallel(self, actions: List[str], task_data: Dict[str, Any]) -> Dict[str, Any]:
+        print("in parallel")
         """
         Execute multiple actions in parallel using threading.
         

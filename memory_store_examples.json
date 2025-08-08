@@ -10,7 +10,7 @@
         ]
       }
     },
-    
+
     "basic_request": {
       "description": "Basic request with source and timestamp",
       "request": {
@@ -25,7 +25,7 @@
         "timestamp": "2025-08-08T10:00:00Z"
       }
     },
-    
+
     "multiple_memories": {
       "description": "Multiple memories in one batch",
       "request": {
@@ -54,7 +54,7 @@
         "timestamp": "2025-08-08T10:15:00Z"
       }
     },
-    
+
     "full_featured_request": {
       "description": "Full featured request with all optional fields",
       "request": {
@@ -82,7 +82,7 @@
         }
       }
     },
-    
+
     "ray_style_request": {
       "description": "How Ray might send memories",
       "request": {
@@ -121,7 +121,7 @@
       }
     }
   },
-  
+
   "field_definitions": {
     "memories": {
       "required": true,
@@ -151,7 +151,7 @@
       "description": "Additional metadata for the entire batch"
     }
   },
-  
+
   "common_memory_fields": {
     "content": "The main memory text/content",
     "type": "Category/type of memory",
