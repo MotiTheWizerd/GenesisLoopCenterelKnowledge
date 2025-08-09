@@ -28,27 +28,20 @@ def send_test_messages():
     
     # Test messages
     messages = [
-        {
-            "message": "First test message to ray-response",
-            "ray_prompt": "Testing the forwarding functionality - message 1",
-            "is_final": "false",
-            "timestamp": datetime.now().isoformat(),
-            "test_id": 1
-        },
-        {
-            "message": "Second test message to ray-response", 
-            "ray_prompt": "Testing the forwarding functionality - message 2",
-            "is_final": "false",
-            "timestamp": datetime.now().isoformat(),
-            "test_id": 2
-        },
-        {
-            "message": "Third and final test message to ray-response",
-            "ray_prompt": "Testing the forwarding functionality - message 3", 
-            "is_final": "true",
-            "timestamp": datetime.now().isoformat(),
-            "test_id": 3
-        }
+
+{
+"message": "Probe index with multiple known symbols from index.json",
+"is_final": "true",
+"command_calls": [
+{ "command": "findSymbolFromIndex", "args": ["initialize"] },
+{ "command": "findSymbolFromIndex", "args": ["handleSystemToggle"] },
+{ "command": "findSymbolFromIndex", "args": ["getSystemStates"] },
+{ "command": "findSymbolFromIndex", "args": ["enableAllSystemsViaControlPanel"] },
+{ "command": "findSymbolFromIndex", "args": ["checkActivityMonitorStatus"] }
+]
+}
+
+
     ]
     
     print("🚀 Sending 3 test messages to ray-response endpoint...\n")

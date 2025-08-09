@@ -219,13 +219,14 @@ class HeartbeatHandler:
             else:
                 heartbeat_dict["vsrequests"] = []
             
-            # Include ray_responses (Ray's responses to deliver to user)
+            # Don't include ray_responses in heartbeat as they're already sent directly
+            # This prevents duplicate messages in VSCode
+            heartbeat_dict["ray_responses"] = []
+            
+            # Clear ray_responses to free memory
             if ray_responses:
-                heartbeat_dict["ray_responses"] = ray_responses.copy()
-                ray_responses.clear()  # Clear after including
-                print(f"📨 Included {len(heartbeat_dict['ray_responses'])} ray_responses in heartbeat")
-            else:
-                heartbeat_dict["ray_responses"] = []
+                ray_responses.clear()
+                print(f"🔄 Cleared ray_responses without including in heartbeat")
             
             # Include working status
             heartbeat_dict["ray_working_on_request"] = ray_working_on_request

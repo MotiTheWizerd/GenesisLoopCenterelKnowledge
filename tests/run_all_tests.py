@@ -25,7 +25,9 @@ def run_feature_tests():
         "Routing System": "tests/modules/routes/",
         "Logging System": "tests/modules/logging/",
         "Directory System": "tests/modules/directory/",
-        "Read File System": "tests/modules/directory/test_read_file_integration.py"
+        "Read File System": "tests/modules/directory/test_read_file_integration.py",
+        "VSCode Logic System": "tests/modules/vscode_logic/",
+        "Integration Tests": "tests/integration/"
     }
     
     total_passed = 0
@@ -74,7 +76,9 @@ def run_quick_tests():
     critical_tests = [
         "tests/modules/task/test_models.py::TestTaskRequestFromRay::test_create_basic_request",
         "tests/modules/task/test_handler.py::TestTaskManager::test_create_batch_tasks",
-        "tests/modules/routes/test_reflect_routes.py"
+        "tests/modules/routes/test_reflect_routes.py",
+        "tests/modules/vscode_logic/test_forward_integration.py",
+        "tests/modules/task/test_vscode_integration.py"
     ]
     
     exit_code = pytest.main([
@@ -100,7 +104,9 @@ def run_specific_feature(feature_name: str):
         "routes": "tests/modules/routes/",
         "logging": "tests/modules/logging/",
         "directory": "tests/modules/directory/",
-        "read_file": "tests/run_read_file_tests.py"
+        "read_file": "tests/run_read_file_tests.py",
+        "vscode": "tests/modules/vscode_logic/",
+        "integration": "tests/integration/"
     }
     
     if feature_name not in feature_map:
@@ -126,7 +132,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="AI Consciousness Server Test Runner")
     parser.add_argument("--quick", action="store_true", help="Run quick smoke tests only")
-    parser.add_argument("--feature", type=str, help="Run tests for specific feature (task, heartbeat, reflect, routes, logging)")
+    parser.add_argument("--feature", type=str, help="Run tests for specific feature (task, heartbeat, reflect, routes, logging, vscode, integration)")
     
     args = parser.parse_args()
     

@@ -445,6 +445,10 @@ class TaskManager:
         elif action in ["overwrite_file", "write_file", "read_file"]:
             return self._execute_file_operation(task_data)
         
+        # VSCode Logic actions
+        elif action in ["send_vs_response"]:
+            return self._execute_vscode_logic_action(task_data)
+        
         # Health actions
         elif action in ["health_check", "system_status"]:
             return self._execute_health_action(task_data)
@@ -880,6 +884,39 @@ class TaskManager:
             
             # Execute the file operation
             response = file_ops_manager.handle_task(file_task_data)
+            
+            return {
+                "executed": True,
+                "action": task_data.get("action"),
+                "results": response.dict()
+            }
+                
+        except Exception as e:
+            return {"executed": False, "error": str(e)}
+    
+    def _execute_vscode_logic_action(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute VSCode Logic operations immediately."""
+        try:
+            from modules.vscode_logic.handler import vscode_logic_manager
+            
+            # Create task request for VSCode Logic operations
+            vscode_task_data = {
+                "task": [task_data],  # Wrap in list as per VSCodeTaskRequest structure
+                "assigned_by": task_data.get("assigned_by", "ray"),
+                "execute_immediately": True
+            }
+            
+            # VSCode Logic operation is async, so we need to handle it carefully
+            import asyncio
+            import concurrent.futures
+            
+            def run_async_vscode_task():
+                return asyncio.run(vscode_logic_manager.handle_task(vscode_task_data))
+            
+            # Run the async function in a separate thread
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_async_vscode_task)
+                response = future.result()
             
             return {
                 "executed": True,
