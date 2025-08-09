@@ -2,6 +2,7 @@
 
 import pytest
 
+
 # Enable asyncio plugin
 pytest_plugins = ["pytest_asyncio"]
 
